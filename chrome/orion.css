@@ -9,7 +9,6 @@
 
 .viewContainer {
   font-family: monospace;
-  font-size: inherit; /* inherit browser's default monospace font size */
 }
 
 .view {

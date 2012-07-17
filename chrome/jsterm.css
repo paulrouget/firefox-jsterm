@@ -1,6 +1,6 @@
 window {
-  background: #131c26; /* Background of the editor */
-  color: #8fa1b2; /* Default text color */
+  background: #131c26;
+  color: #8fa1b2;
   font-family: monospace;
 }
 
@@ -20,4 +20,28 @@ window {
 
 #completion-candidates {
   margin-left: 15px;
+}
+
+#object-tree {
+  font-family: monospace;
+  background: #131c26;
+  color: #8fa1b2;
+  border: 0;
+  -moz-appearance: none;
+  margin-left: 0;
+}
+
+
+#object-tree > treechildren,
+#object-tree > treechildren::-moz-tree-row {
+  background: #131c26; /* Background of the editor */
+}
+
+#object-tree > treechildren::-moz-tree-row(odd) {
+  background-color: #0E151D;
+}
+
+#object-tree > treechildren::-moz-tree-row(selected) {
+  background-color: #26384E;
+  color: white;
 }

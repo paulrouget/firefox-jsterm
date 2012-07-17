@@ -7,13 +7,13 @@ Cu.import("resource:///modules/WebConsoleUtils.jsm");
  * Todo
  * . change style on multiline
  * . change font
- * . add object inspector
  * . ctrl-c should copy the output selection if any
  * . delete listeners & map
  * . checkbox status
  * . multiline history
  * . chrome mode
  * . use getLineDelimiter
+ * . Complete on keywords (function)
  */
 
 const JSTERM_MARK = "orion.annotation.jstermobject";
@@ -33,13 +33,14 @@ let JSTermUI = {
 
     this.handleKeys = this.handleKeys.bind(this);
     this.handleClick = this.handleClick.bind(this);
+    this.hideObjInspector = this.hideObjInspector.bind(this);
     this.focus = this.focus.bind(this);
     this.container = document.querySelector("#editors-container");
 
     let outputContainer = document.querySelector("#output-container");
     let inputContainer = document.querySelector("#input-container");
     this.output.init(outputContainer, {
-      initialText: "/* JavaScript Terminal.\n   'Return' to execute\n   'Shift-Return' to toggle multiline-mode\n*/\n",
+      initialText: "/**\n * 'Shift-Return' to toggle multiline-mode\n */\n",
       mode: SourceEditor.MODES.JAVASCRIPT,
       readOnly: true,
       theme: "chrome://jsterm/content/orion.css",
@@ -62,6 +63,7 @@ let JSTermUI = {
     this.output._annotationStyler.addAnnotationType(JSTERM_MARK);
     this.output.editorElement.addEventListener("click", this.handleClick, true);
     this.output.editorElement.addEventListener("keydown", this.focus, true);
+    this.output.addEventListener("focus", this.hideObjInspector, true);
   },
 
   initInput: function() {
@@ -72,6 +74,7 @@ let JSTermUI = {
 
     this.makeEditorFitContent(this.input);
     this.ensureInputIsAlwaysVisible(this.input);
+    this.input.editorElement.addEventListener("focus", this.hideObjInspector, true);
     this.input.editorElement.addEventListener("keydown", this.handleKeys, true);
     this.input.editorElement.ownerDocument.defaultView.setTimeout(function() {
       this.input.focus();
@@ -171,7 +174,7 @@ let JSTermUI = {
     }
 
     if (code == ":help") {
-      this.output.setText("\nHelp: FIXME", this.output.getCharCount());
+      this.output.setText("\n// Help: FIXME", this.output.getCharCount());
       return;
     }
 
@@ -260,7 +263,7 @@ let JSTermUI = {
       if (this.objects.has(idx)) {
         let obj = this.objects.get(idx);
         e.stopPropagation();
-        dump("\n INSPECT: " + obj + "\n");
+        this.inspect(obj);
       }
     }
   },
@@ -282,6 +285,19 @@ let JSTermUI = {
 
     this.completion.destroy();
     this.completion = null;
+  },
+
+  inspect: function(obj) {
+    let treeview = new PropertyTreeView2();
+    treeview.data = {object:obj};
+    let tree = document.querySelector("#object-tree");
+    tree.hidden = false;
+    tree.view = treeview;
+  },
+
+  hideObjInspector: function() {
+    let tree = document.querySelector("#object-tree");
+    tree.hidden = true;
   },
 }
 
@@ -333,7 +349,7 @@ JSCompletion.prototype = {
     let root = line.substr(0, caret.col);
 
     let candidates = JSPropertyProvider(this.sb, root);
-    if (!candidates) return;
+    if (!candidates || candidates.matches.length == 0) return;
 
     let offset = this.editor.getCaretOffset();
 
@@ -409,3 +425,306 @@ JSCompletion.prototype = {
     this.editor = null;
   },
 }
+
+
+
+
+///////////////////////////////////////////////////////////////////////////
+//// PropertyTreeView2
+
+/**
+ * This is an implementation of the nsITreeView interface. For comments on the
+ * interface properties, see the documentation:
+ * https://developer.mozilla.org/en/XPCOM_Interface_Reference/nsITreeView
+ */
+var PropertyTreeView2 = function() {
+  this._rows = [];
+  this._objectCache = {};
+};
+
+PropertyTreeView2.prototype = {
+  /**
+   * Stores the visible rows of the tree.
+   * @private
+   */
+  _rows: null,
+
+  /**
+   * Stores the nsITreeBoxObject for this tree.
+   * @private
+   */
+  _treeBox: null,
+
+  /**
+   * Stores cached information about local objects being inspected.
+   * @private
+   */
+  _objectCache: null,
+
+  /**
+   * Use this setter to update the content of the tree.
+   *
+   * @param object aData
+   *        A meta object that holds information about the object you want to
+   *        display in the property panel. Object properties:
+   *        - object:
+   *        This is the raw object you want to display. You can only provide
+   *        this object if you want the property panel to work in sync mode.
+   *        - remoteObject:
+   *        An array that holds information on the remote object being
+   *        inspected. Each element in this array describes each property in the
+   *        remote object. See WebConsoleUtils.namesAndValuesOf() for details.
+   *        - rootCacheId:
+   *        The cache ID where the objects referenced in remoteObject are found.
+   *        - panelCacheId:
+   *        The cache ID where any object retrieved by this property panel
+   *        instance should be stored into.
+   *        - remoteObjectProvider:
+   *        A function that is invoked when a new object is needed. This is
+   *        called when the user tries to expand an inspectable property. The
+   *        callback must take four arguments:
+   *          - fromCacheId:
+   *          Tells from where to retrieve the object the user picked (from
+   *          which cache ID).
+   *          - objectId:
+   *          The object ID the user wants.
+   *          - panelCacheId:
+   *          Tells in which cache ID to store the objects referenced by
+   *          objectId so they can be retrieved later.
+   *          - callback:
+   *          The callback function to be invoked when the remote object is
+   *          received. This function takes one argument: the raw message
+   *          received from the Web Console content script.
+   */
+  set data(aData) {
+    let oldLen = this._rows.length;
+
+    this._cleanup();
+
+    if (!aData) {
+      return;
+    }
+
+    if (aData.remoteObject) {
+      this._rootCacheId = aData.rootCacheId;
+      this._panelCacheId = aData.panelCacheId;
+      this._remoteObjectProvider = aData.remoteObjectProvider;
+      this._rows = [].concat(aData.remoteObject);
+      this._updateRemoteObject(this._rows, 0);
+    }
+    else if (aData.object) {
+      this._rows = this._inspectObject(aData.object);
+    }
+    else {
+      throw new Error("First argument must have a .remoteObject or " +
+                      "an .object property!");
+    }
+
+    if (this._treeBox) {
+      this._treeBox.beginUpdateBatch();
+      if (oldLen) {
+        this._treeBox.rowCountChanged(0, -oldLen);
+      }
+      this._treeBox.rowCountChanged(0, this._rows.length);
+      this._treeBox.endUpdateBatch();
+    }
+  },
+
+  /**
+   * Update a remote object so it can be used with the tree view. This method
+   * adds properties to each array element.
+   *
+   * @private
+   * @param array aObject
+   *        The remote object you want prepared for use with the tree view.
+   * @param number aLevel
+   *        The level you want to give to each property in the remote object.
+   */
+  _updateRemoteObject: function PTV__updateRemoteObject(aObject, aLevel)
+  {
+    aObject.forEach(function(aElement) {
+      aElement.level = aLevel;
+      aElement.isOpened = false;
+      aElement.children = null;
+    });
+  },
+
+  /**
+   * Inspect a local object.
+   *
+   * @private
+   * @param object aObject
+   *        The object you want to inspect.
+   */
+  _inspectObject: function PTV__inspectObject(aObject)
+  {
+    this._objectCache = {};
+    this._remoteObjectProvider = this._localObjectProvider.bind(this);
+    let children = WebConsoleUtils.namesAndValuesOf(aObject, this._objectCache);
+    this._updateRemoteObject(children, 0);
+    return children;
+  },
+
+  /**
+   * An object provider for when the user inspects local objects (not remote
+   * ones).
+   *
+   * @private
+   * @param string aFromCacheId
+   *        The cache ID from where to retrieve the desired object.
+   * @param string aObjectId
+   *        The ID of the object you want.
+   * @param string aDestCacheId
+   *        The ID of the cache where to store any objects referenced by the
+   *        desired object.
+   * @param function aCallback
+   *        The function you want to receive the object.
+   */
+  _localObjectProvider:
+  function PTV__localObjectProvider(aFromCacheId, aObjectId, aDestCacheId,
+                                    aCallback)
+  {
+    let object = WebConsoleUtils.namesAndValuesOf(this._objectCache[aObjectId],
+                                                  this._objectCache);
+    aCallback({cacheId: aFromCacheId,
+               objectId: aObjectId,
+               object: object,
+               childrenCacheId: aDestCacheId || aFromCacheId,
+    });
+  },
+
+  /** nsITreeView interface implementation **/
+
+  selection: null,
+
+  get rowCount()                     { return this._rows.length; },
+  setTree: function(treeBox)         { this._treeBox = treeBox;  },
+  getCellText: function(idx, column) {
+    let row = this._rows[idx];
+    if (column.id == "propName") {
+      return row.name;
+    } else {
+      return row.value;
+    }
+  },
+  getLevel: function(idx) {
+    return this._rows[idx].level;
+  },
+  isContainer: function(idx) {
+    return !!this._rows[idx].inspectable;
+  },
+  isContainerOpen: function(idx) {
+    return this._rows[idx].isOpened;
+  },
+  isContainerEmpty: function(idx)    { return false; },
+  isSeparator: function(idx)         { return false; },
+  isSorted: function()               { return false; },
+  isEditable: function(idx, column)  { return false; },
+  isSelectable: function(row, col)   { return true; },
+
+  getParentIndex: function(idx)
+  {
+    if (this.getLevel(idx) == 0) {
+      return -1;
+    }
+    for (var t = idx - 1; t >= 0; t--) {
+      if (this.isContainer(t)) {
+        return t;
+      }
+    }
+    return -1;
+  },
+
+  hasNextSibling: function(idx, after)
+  {
+    var thisLevel = this.getLevel(idx);
+    return this._rows.slice(after + 1).some(function (r) r.level == thisLevel);
+  },
+
+  toggleOpenState: function(idx)
+  {
+    let item = this._rows[idx];
+    if (!item.inspectable) {
+      return;
+    }
+
+    if (item.isOpened) {
+      this._treeBox.beginUpdateBatch();
+      item.isOpened = false;
+
+      var thisLevel = item.level;
+      var t = idx + 1, deleteCount = 0;
+      while (t < this._rows.length && this.getLevel(t++) > thisLevel) {
+        deleteCount++;
+      }
+
+      if (deleteCount) {
+        this._rows.splice(idx + 1, deleteCount);
+        this._treeBox.rowCountChanged(idx + 1, -deleteCount);
+      }
+      this._treeBox.invalidateRow(idx);
+      this._treeBox.endUpdateBatch();
+    }
+    else {
+      let levelUpdate = true;
+      let callback = function _onRemoteResponse(aResponse) {
+        this._treeBox.beginUpdateBatch();
+        item.isOpened = true;
+
+        if (levelUpdate) {
+          this._updateRemoteObject(aResponse.object, item.level + 1);
+          item.children = aResponse.object;
+        }
+
+        this._rows.splice.apply(this._rows, [idx + 1, 0].concat(item.children));
+
+        this._treeBox.rowCountChanged(idx + 1, item.children.length);
+        this._treeBox.invalidateRow(idx);
+        this._treeBox.endUpdateBatch();
+      }.bind(this);
+
+      if (!item.children) {
+        let fromCacheId = item.level > 0 ? this._panelCacheId :
+                                           this._rootCacheId;
+        this._remoteObjectProvider(fromCacheId, item.objectId,
+                                   this._panelCacheId, callback);
+      }
+      else {
+        levelUpdate = false;
+        callback({object: item.children});
+      }
+    }
+  },
+
+  getImageSrc: function(idx, column) { },
+  getProgressMode : function(idx,column) { },
+  getCellValue: function(idx, column) { },
+  cycleHeader: function(col, elem) { },
+  selectionChanged: function() { },
+  cycleCell: function(idx, column) { },
+  performAction: function(action) { },
+  performActionOnCell: function(action, index, column) { },
+  performActionOnRow: function(action, row) { },
+  getRowProperties: function(idx, column, prop) { },
+  getCellProperties: function(idx, column, prop) { },
+  getColumnProperties: function(column, element, prop) { },
+
+  setCellValue: function(row, col, value)               { },
+  setCellText: function(row, col, value)                { },
+  drop: function(index, orientation, dataTransfer)      { },
+  canDrop: function(index, orientation, dataTransfer)   { return false; },
+
+  _cleanup: function PTV__cleanup()
+  {
+    if (this._rows.length) {
+      // Reset the existing _rows children to the initial state.
+      this._updateRemoteObject(this._rows, 0);
+      this._rows = [];
+    }
+
+    delete this._objectCache;
+    delete this._rootCacheId;
+    delete this._panelCacheId;
+    delete this._remoteObjectProvider;
+  },
+};
