@@ -1,0 +1,124 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#viewDiv {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.viewContainer {
+  font-family: monospace;
+  font-size: inherit; /* inherit browser's default monospace font size */
+}
+
+.view {
+  color: #8fa1b2; /* Default text color */
+  padding-left: 4px;
+}
+
+.ruler {
+  color: #7a8a99;
+}
+.ruler.jsterminput {
+  width: 15px;
+  padding-left: 4px;
+}
+.ruler.lines {
+  border-right: 1px solid #303b47;
+  min-width: 1.4em;
+  padding-left: 4px;
+  padding-right: 4px;
+  text-align: end;
+}
+
+.ruler.linesWithAnnotations {
+  min-width: 0;
+  padding-left: 0;
+}
+
+.ruler.overview {
+  border-left: 1px solid #303b47;
+  width: 14px;
+  text-align: start;
+}
+
+.annotationLine.object > span:first-of-type {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.token_singleline_comment {
+  color: #5c6773; /* green */
+}
+
+.token_multiline_comment {
+  color: #5c6773; /* green */
+}
+
+.token_doc_comment {
+  color: #5c6773; /* green */
+}
+
+.token_doc_html_markup {
+  color: #a673bf; /* purple */
+}
+
+.token_doc_tag {
+  color: #a673bf; /* purple */
+}
+
+.token_task_tag { /* "TODO" */
+  color: black;
+  background: yellow;
+}
+
+.token_string {
+  color: #3689b2; /* blue */
+}
+
+.token_keyword {
+  color: #a673bf; /* purple */
+}
+
+.token_space {
+  /* images/white_space.png */
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAkAAAAJCAIAAABv85FHAAAABnRSTlMA/wAAAACkwsAdAAAAIUlEQVR4nGP4z8CAC+GUIEXuABhgkTuABEiRw2cmae4EAH05X7xDolNRAAAAAElFTkSuQmCC");
+  background-repeat: no-repeat;
+  background-position: center center;
+}
+
+.token_tab {
+  /* images/white_tab.png */
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAJCAIAAACJ2loDAAAABnRSTlMA/wD/AP83WBt9AAAAMklEQVR4nGP4TwRgoK6i52c3bz5w6zMSA6tJn28d2Lx589nnCAYu63AaSLxJRLoJPwAAeNk0aG4opfMAAAAASUVORK5CYII=");
+  background-repeat: no-repeat;
+  background-position: left center;
+}
+
+/* Styling for html syntax highlighting */
+.entity-name-tag {
+  color: #a673bf; /* purple */
+}
+
+.entity-other-attribute-name {
+  color: #a673bf; /* purple */
+}
+
+.punctuation-definition-comment {
+  color: #45a946; /* green */
+}
+
+.comment {
+  color: #45a946; /* green */
+}
+
+.string-quoted {
+  color: #1e66b1; /* blue */
+  font-style: italic;
+}
+
+.invalid {
+  color: red;
+  font-weight: bold;
+}
+

@@ -1,0 +1,23 @@
+window {
+  background: #131c26; /* Background of the editor */
+  color: #8fa1b2; /* Default text color */
+  font-family: monospace;
+}
+
+#editors-container {
+  padding: 5px;
+}
+
+#prompt {
+  width: 10px;
+  min-width: 10px;
+  max-width: 10px;
+}
+
+#output-container {
+  margin-left: 10px;
+}
+
+#completion-candidates {
+  margin-left: 15px;
+}
