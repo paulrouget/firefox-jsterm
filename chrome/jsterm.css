@@ -2,7 +2,7 @@ window {
   background: #131c26;
   color: white;
   font-family: Monaco, monospace;
-  font-weight: lighter;
+  font-size: 12px;
 }
 
 #object-inspector > tree {

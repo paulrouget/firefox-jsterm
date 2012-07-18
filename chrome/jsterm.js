@@ -8,12 +8,8 @@ Cu.import("resource:///modules/WebConsoleUtils.jsm");
  * . ctrl-c should copy the output selection if any
  * . delete listeners & map
  * . checkbox status
- * . Complete on keywords (function)
  * . highlight common DOM keywords
  * . save history and share it
- * . better enter/shift-enter thing
- * . prevent-default for ctrl-l
- * . implement close / ctrl-D
  * . make tree width persistent
  */
 
@@ -24,16 +20,22 @@ let JSTermUI = {
   output: new SourceEditor(),
   objects: new Map(),
 
+  close: function() {
+    this.manager.closeForBrowser(this.browser);
+  },
+
   registerCommands: function() {
     this.commands = [
-      {name: ":chrome", help: "switch to Chrome mode",
-       exec: this.switchToChromeMode.bind(this)},
-      {name: ":content", help: "switch to Content mode",
-       exec: this.switchToContentMode.bind(this)},
+      {name: ":close", help: "close terminal",
+       exec: this.close.bind(this)},
       {name: ":clear", help: "clear screen",
        exec: this.clear.bind(this)},
       {name: ":help", help: "show this help",
        exec: this.help.bind(this)},
+      {name: ":content", help: "switch to Content mode",
+       exec: this.switchToContentMode.bind(this)},
+      {name: ":chrome", help: "switch to Chrome mode",
+       exec: this.switchToChromeMode.bind(this)},
     ];
   },
 
@@ -52,9 +54,11 @@ let JSTermUI = {
     this.input.focus();
   },
 
-  init: function() {
-    this.content = window.parent.gBrowser.contentWindow;
-    this.chrome = window.parent;
+  init: function(aManager, aBrowser, aContent, aChrome) {
+    this.manager = aManager;
+    this.browser = aBrowser;
+    this.content = aContent;
+    this.chrome = aChrome;
 
     this.registerCommands();
 
@@ -74,10 +78,6 @@ let JSTermUI = {
 
     this.input.init(this.inputContainer, {
       mode: SourceEditor.MODES.JAVASCRIPT,
-      keys: [{action: "Clear output",
-             code: Ci.nsIDOMKeyEvent.DOM_VK_L,
-             callback: this.clear.bind(this),
-             ctrl: true}],
       theme: "chrome://jsterm/content/orion.css",
     }, this.initInput.bind(this));
 
@@ -274,7 +274,7 @@ let JSTermUI = {
       }
 
       if (isAnObject) {
-        resultStr += " (click to inspect)";
+        resultStr += " [+]";
       }
 
       if (code == resultStr) {
@@ -318,10 +318,13 @@ let JSTermUI = {
     let text = "\n/**";
     text += "\n * 'Return' to evaluate entry,";
     text += "\n * 'Tab' for autocompletion,";
+    text += "\n * 'Ctrl-l' clear screen,";
+    text += "\n * 'Ctrl-d' close term,";
     text += "\n * 'up/down' to browser history,";
     text += "\n * 'Shift+Return' to switch to multiline editing,";
     text += "\n * 'Shift+Return' to evaluate multiline entry,";
-    text += "\n *  use 'print(aString)' to dump text in the terminal,";
+    text += "\n * ";
+    text += "\n * Use 'print(aString)' to dump text in the terminal,";
     text += "\n * ";
     text += "\n * Commands:";
     for (let cmd of this.commands) {
@@ -352,6 +355,17 @@ let JSTermUI = {
         e.preventDefault();
         this.newEntry(code);
       }
+    }
+
+    if (e.keyCode == 68 && e.ctrlKey) {
+      e.stopPropagation();
+      e.preventDefault();
+      this.close();
+    }
+    if (e.keyCode == 76 && e.ctrlKey) {
+      e.stopPropagation();
+      e.preventDefault();
+      this.clear();
     }
 
     if (e.keyCode == 38) {

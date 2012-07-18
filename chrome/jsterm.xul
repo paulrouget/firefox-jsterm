@@ -9,7 +9,6 @@
         macanimationtype="document"
         screenX="4" screenY="4"
         width="640" height="480"
-        onload="JSTermUI.init()"
         persist="screenX screenY width height sizemode">
 
   <script type="application/javascript" src="jsterm.js"/>

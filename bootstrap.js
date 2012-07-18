@@ -118,7 +118,7 @@ let JSTermManager = {
   },
 }
 
-function JSTerm(aBrowser) {
+function JSTerm(aBrowser, aManager) {
   this.browser = aBrowser;
   this.chromeDoc = aBrowser.ownerDocument;
   this.chromeWin = this.chromeDoc.defaultView;
@@ -144,6 +144,13 @@ JSTerm.prototype = {
     container.appendChild(iframe);
     nbox.appendChild(splitter);
     nbox.appendChild(container);
+
+    iframe.contentWindow.onload = function() {
+      iframe.contentWindow.JSTermUI.init(JSTermManager,
+                                         this.browser,
+                                         this.browser.contentWindow,
+                                         this.chromeWin);
+    }.bind(this);
   },
   destroy: function() {
     let nbox = this.chromeWin.gBrowser.getNotificationBox(this.browser);

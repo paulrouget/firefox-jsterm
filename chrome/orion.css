@@ -10,6 +10,7 @@
 .viewContainer {
   font-family: Monaco, monospace;
   font-weight: lighter;
+  font-size: 12px;
 }
 
 .view {
@@ -25,6 +26,7 @@
   width: 15px;
   padding-left: 4px;
 }
+
 .ruler.lines {
   border-right: 1px solid #303b47;
   min-width: 1.4em;
@@ -45,12 +47,11 @@
 }
 
 .annotationLine.object {
-  /*
-    text-decoration: underline;
-    -moz-text-decoration-color: grey;
-    -moz-text-decoration-style: dotted;
-  */
   cursor: pointer;
+}
+
+.annotationLine.object:hover > * {
+  color: white!important;
 }
 
 .token_doc_comment,
