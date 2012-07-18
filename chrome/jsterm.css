@@ -5,7 +5,7 @@ window {
   font-weight: lighter;
 }
 
-#object-tree {
+#object-inspector > tree {
   background: #131c26;
   color: #8fa1b2;
   font-family: Monaco, monospace;
@@ -19,9 +19,10 @@ window {
 }
 
 #prompt {
-  width: 10px;
-  min-width: 10px;
-  max-width: 10px;
+  color: #8fa1b2;
+  width: 12px;
+  min-width: 12px;
+  max-width: 12px;
 }
 
 #input-container {
@@ -46,7 +47,7 @@ window {
 }
 
 #output-container {
-  margin-left: 10px;
+  margin-left: 12px;
 }
 
 #completion-candidates {
@@ -55,23 +56,24 @@ window {
   font-size: 12px;
 }
 
-#object-tree {
+#object-inspector > tree {
   border: 0;
   -moz-appearance: none;
   margin-left: 0;
+  margin-right: 0;
 }
 
 
-#object-tree > treechildren,
-#object-tree > treechildren::-moz-tree-row {
+#object-inspector > tree > treechildren,
+#object-inspector > tree > treechildren::-moz-tree-row {
   background: #131c26; /* Background of the editor */
 }
 
-#object-tree > treechildren::-moz-tree-row(odd) {
+#object-inspector > tree > treechildren::-moz-tree-row(odd) {
   background-color: #0E151D;
 }
 
-#object-tree > treechildren::-moz-tree-row(selected) {
+#object-inspector > tree > treechildren::-moz-tree-row(selected) {
   background-color: #26384E;
   color: white;
 }

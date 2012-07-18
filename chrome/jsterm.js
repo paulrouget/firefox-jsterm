@@ -8,13 +8,13 @@ Cu.import("resource:///modules/WebConsoleUtils.jsm");
  * . ctrl-c should copy the output selection if any
  * . delete listeners & map
  * . checkbox status
- * . use getLineDelimiter
  * . Complete on keywords (function)
  * . highlight common DOM keywords
- * . console.log / print()
  * . save history and share it
  * . better enter/shift-enter thing
- * . overflow-x
+ * . prevent-default for ctrl-l
+ * . implement close / ctrl-D
+ * . make tree width persistent
  */
 
 const JSTERM_MARK = "orion.annotation.jstermobject";
@@ -86,7 +86,7 @@ let JSTermUI = {
   switchToChromeMode: function() {
     let label = document.querySelector("#completion-candidates > label");
     this.sb = this.buildSandbox(this.chrome);
-    this.output.setText("\n:chrome // Switched to chrome mode.", this.output.getCharCount());
+    this.output.setText(" // Switched to chrome mode.", this.output.getCharCount());
     if (this.completion) this.completion.destroy();
     this.completion = new JSCompletion(this.input, label, this.sb);
     this.inputContainer.classList.add("chrome");
@@ -99,7 +99,7 @@ let JSTermUI = {
     if (this.completion) this.completion.destroy();
     this.completion = new JSCompletion(this.input, label, this.sb);
     if (needMessage) {
-      this.output.setText("\n:content // Switched to content mode.", this.output.getCharCount());
+      this.output.setText(" // Switched to content mode.", this.output.getCharCount());
     }
     this.inputContainer.classList.remove("chrome");
   },
@@ -107,8 +107,9 @@ let JSTermUI = {
   buildSandbox: function(win) {
     let sb = Cu.Sandbox(win, {sandboxPrototype: win, wantXrays: false});
     sb.print = function(msg) {
-      dump(msg + "\n");
-    }
+      this.printedSomething = true;
+      this.output.setText("\n" + msg, this.output.getCharCount());
+    }.bind(this);
     return sb;
   },
 
@@ -228,6 +229,14 @@ let JSTermUI = {
     this.history.add(code);
     this.input.setText("");
     this.multiline = false;
+    this.printedSomething = false;
+
+    if (code == "") {
+      this.output.setText("\n", this.output.getCharCount());
+      return;
+    }
+
+    this.output.setText("\n" + code, this.output.getCharCount());
 
     for (let cmd of this.commands) {
       if (cmd.name == code) {
@@ -245,41 +254,45 @@ let JSTermUI = {
 
     if (error) {
       error = error.toString();
-      if (this.isMultiline(error) || this.isMultiline(code)) {
-        this.output.setText("\n" + code + "\n/* error:\n" + error + "\n*/", this.output.getCharCount());
+      if (this.isMultiline(error) || this.isMultiline(code) || this.printedSomething) {
+        this.output.setText("\n/* error:\n" + error + "\n*/", this.output.getCharCount());
       } else {
-        this.output.setText("\n" + code + " // error: " + error, this.output.getCharCount());
+        this.output.setText(" // error: " + error, this.output.getCharCount());
       }
     } else {
       if ((typeof result) == "string") {
         result = "\"" + result + "\"";
       }
-      if (result == undefined) {
-        result = "undefined";
-      }
-
 
       let isAnObject = (typeof result) == "object";
-      let resultStr = result.toString();
+      let resultStr;
+
+      if (result == undefined) {
+        resultStr = "undefined";
+      } else {
+        resultStr = result.toString();
+      }
 
       if (isAnObject) {
         resultStr += " (click to inspect)";
       }
 
       if (code == resultStr) {
-        this.output.setText("\n" + code, this.output.getCharCount());
-      } else if (code) {
-        if (this.isMultiline(code)) {
-          if (this.isMultiline(resultStr)) {
-            this.output.setText("\n" + code + "\n/*\n" + resultStr + "\n*/", this.output.getCharCount());
+        // Do nothing
+      } else {
+        if (this.isMultiline(code) || this.printedSomething) {
+          if (result == undefined && this.printedSomething) {
+            // Do nothing. I don't think it's interesting to print "undefined" in this case.
+          } else if (this.isMultiline(resultStr)) {
+            this.output.setText("\n/*\n" + resultStr + "\n*/", this.output.getCharCount());
           } else {
-            this.output.setText("\n" + code + "\n// " + resultStr, this.output.getCharCount());
+            this.output.setText("\n// " + resultStr, this.output.getCharCount());
           }
         } else {
           if (this.isMultiline(resultStr)) {
-            this.output.setText("\n" + code + "\n/*\n" + resultStr + "\n*/", this.output.getCharCount());
+            this.output.setText("\n/*\n" + resultStr + "\n*/", this.output.getCharCount());
           } else {
-            this.output.setText("\n" + code + " // " + resultStr, this.output.getCharCount());
+            this.output.setText(" // " + resultStr, this.output.getCharCount());
           }
         }
         if (isAnObject) {
@@ -287,8 +300,6 @@ let JSTermUI = {
           this.objects.set(line, result);
           this.markRange(line);
         }
-      } else {
-        this.output.setText("\n", this.output.getCharCount());
       }
     }
   },
@@ -304,11 +315,13 @@ let JSTermUI = {
   },
 
   help: function() {
-    let text = "\n:help\n/**";
+    let text = "\n/**";
     text += "\n * 'Return' to evaluate entry,";
-    text += "\n * 'Shift+Return' to add a line,";
     text += "\n * 'Tab' for autocompletion,";
     text += "\n * 'up/down' to browser history,";
+    text += "\n * 'Shift+Return' to switch to multiline editing,";
+    text += "\n * 'Shift+Return' to evaluate multiline entry,";
+    text += "\n *  use 'print(aString)' to dump text in the terminal,";
     text += "\n * ";
     text += "\n * Commands:";
     for (let cmd of this.commands) {
@@ -322,14 +335,23 @@ let JSTermUI = {
     let code = this.input.getText();
 
     if (e.keyCode == 13 && e.shiftKey) {
-      this.multiline = true;
-      return;
+      if (this.multiline) {
+        e.stopPropagation();
+        e.preventDefault();
+        this.newEntry(code);
+      } else {
+        this.multiline = true;
+      }
     }
 
-    if (e.keyCode == 13) {
-      e.stopPropagation();
-      e.preventDefault();
-      this.newEntry(code);
+    if (e.keyCode == 13 && !e.shiftKey) {
+      if (this.multiline) {
+        // Do nothing.
+      } else {
+        e.stopPropagation();
+        e.preventDefault();
+        this.newEntry(code);
+      }
     }
 
     if (e.keyCode == 38) {
@@ -380,20 +402,26 @@ let JSTermUI = {
 
     this.completion.destroy();
     this.completion = null;
+    this.treeview = null;
   },
 
-  inspect: function(obj) {
-    let treeview = new PropertyTreeView2();
+  inspect: function(obj, filter) {
+    let treeview = this.treeview = new PropertyTreeView2();
     treeview.data = {object:obj};
-    let tree = document.querySelector("#object-tree");
-    tree.hidden = false;
+    let tree = document.querySelector("#object-inspector > tree");
     tree.view = treeview;
+    let box = document.querySelector("#object-inspector");
+    box.hidden = false;
     this.focus();
   },
 
   hideObjInspector: function() {
-    let tree = document.querySelector("#object-tree");
-    tree.hidden = true;
+    let box = document.querySelector("#object-inspector");
+    box.hidden = true;
+  },
+
+  filterObjInspector: function(input) {
+    this.treeview.filter(input.value);
   },
 }
 
@@ -409,10 +437,19 @@ function JSCompletion(editor, candidatesWidget, sandbox) {
 
   this.editor.editorElement.addEventListener("keydown", this.handleKeys, true);
 
+  this.buildDictionnary();
+
   this.sb = sandbox;
 }
 
 JSCompletion.prototype = {
+  buildDictionnary: function() {
+    let JSKeywords = "break delete case do catch else class export continue finally const for debugger function default if import this in throw instanceof try let typeof new var return void super while switch with";
+    this.dictionnary = JSKeywords.split(" ");
+    for (let cmd of JSTermUI.commands) {
+      this.dictionnary.push(cmd.name);
+    }
+  },
   handleKeys: function(e) {
     if (e.keyCode == 9) {
       this.handleTab(e);
@@ -436,7 +473,7 @@ JSCompletion.prototype = {
     let line = lines[caret.line]
     let previousChar = line[caret.col - 1];
 
-    if (!previousChar.match(/[a-z]|\./i)) return;
+    if (!previousChar.match(/\w|\.|:/i)) return;
 
     // Initiate Completion
     e.preventDefault();
@@ -444,19 +481,25 @@ JSCompletion.prototype = {
 
     let root = line.substr(0, caret.col);
 
-    let candidates;
-    if (root[0] == ":") {
-      candidates = {
-        matchProp: root,
-        matches: [],
-      };
-      for (let cmd of JSTermUI.commands) {
-        if (cmd.name.indexOf(root) == 0) {
-          candidates.matches.push(cmd.name);
+    let candidates = JSPropertyProvider(this.sb, root);
+
+    let completeFromDict = false;
+    if (candidates && candidates.matchProp) {
+      if (root.length == candidates.matchProp.length) {
+        completeFromDict = true;
+      } else {
+        let charBeforeProp = root[root.length - candidates.matchProp.length - 1];
+        if (charBeforeProp.match(/\s|{|;|\(/)) {
+          completeFromDict = true;
         }
       }
-    } else {
-      candidates = JSPropertyProvider(this.sb, root);
+    }
+    if (completeFromDict) {
+      for (let word of this.dictionnary) {
+        if (word.indexOf(candidates.matchProp) == 0) {
+          candidates.matches.push(word);
+        }
+      }
     }
 
     if (!candidates || candidates.matches.length == 0) return;
@@ -630,6 +673,8 @@ PropertyTreeView2.prototype = {
                       "an .object property!");
     }
 
+    this._unfilteredRows = this._rows;
+
     if (this._treeBox) {
       this._treeBox.beginUpdateBatch();
       if (oldLen) {
@@ -666,7 +711,7 @@ PropertyTreeView2.prototype = {
    * @param object aObject
    *        The object you want to inspect.
    */
-  _inspectObject: function PTV__inspectObject(aObject)
+  _inspectObject: function PTV__inspectObject(aObject, filter)
   {
     this._objectCache = {};
     this._remoteObjectProvider = this._localObjectProvider.bind(this);
@@ -836,5 +881,28 @@ PropertyTreeView2.prototype = {
     delete this._rootCacheId;
     delete this._panelCacheId;
     delete this._remoteObjectProvider;
+  },
+
+  /* Filter mechanism */
+  filter: function(filter) {
+    let oldLen = this._rows.length;
+    let treeview = this;
+
+    let reverse = false;
+    if (filter.length > 1 && filter[0] == "-") {
+      filter = filter.substr(1);
+      reverse = true;
+    }
+
+    let regex = new RegExp(filter, "i");
+    this._rows = this._unfilteredRows.filter(function(e, idx) {
+      e.isOpened = false;
+      if (reverse) {
+        return !regex.test(e.name) && !regex.test(e.value);
+      }
+      return regex.test(e.name) || regex.test(e.value);
+    });
+    this._treeBox.rowCountChanged(0, -oldLen);
+    this._treeBox.rowCountChanged(0, this._rows.length);
   },
 };

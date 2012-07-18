@@ -15,6 +15,7 @@
 .view {
   color: #FFF; /* Default text color */
   padding-left: 4px;
+  overflow-x: hidden!important;
 }
 
 .ruler {

@@ -17,19 +17,26 @@
     <vbox flex="1">
       <vbox id="editors-container" flex="1" onclick="JSTermUI.focus()">
         <hbox flex="1" id="output-container"/>
-        <hbox flex="1" id="input-container"><label id="prompt" value="▸"/></hbox>
+        <hbox flex="1" id="input-container"><label id="prompt" value=">"/></hbox>
       </vbox>
       <vbox id="completion-candidates">
         <label crop="end" />
       </vbox>
     </vbox>
     <splitter class="devtools-side-splitter"/>
-    <tree hidden="true" width="300" hidecolumnpicker="true" id="object-tree">
-      <treecols>
-        <treecol hideheader="true" id="propName" primary="true" flex="3"/>
-        <treecol hideheader="true" id="propValue" flex="2"/>
-      </treecols>
-      <treechildren/>
-    </tree>
+    <vbox hidden="true" width="300" id="object-inspector">
+      <toolbar class="devtools-toolbar">
+        <textbox type="search" class="devtools-searchinput" oninput="JSTermUI.filterObjInspector(this)" emptytext="filter"/>
+        <spacer flex="1"/>
+        <toolbarbutton class="devtools-closebutton" onclick="JSTermUI.hideObjInspector()"/>
+      </toolbar>
+      <tree hidecolumnpicker="true" flex="1">
+        <treecols>
+          <treecol hideheader="true" id="propName" primary="true" flex="3"/>
+          <treecol hideheader="true" id="propValue" flex="2"/>
+        </treecols>
+        <treechildren/>
+      </tree>
+    </vbox>
   </hbox>
 </window>
