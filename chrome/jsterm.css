@@ -1,7 +1,16 @@
 window {
   background: #131c26;
+  color: white;
+  font-family: Monaco, monospace;
+  font-weight: lighter;
+}
+
+#object-tree {
+  background: #131c26;
   color: #8fa1b2;
-  font-family: monospace;
+  font-family: Monaco, monospace;
+  font-weight: lighter;
+  font-size: 10px;
 }
 
 #editors-container {
@@ -14,18 +23,38 @@ window {
   max-width: 10px;
 }
 
+#input-container {
+  border-left: 1px dotted transparent;
+  margin-left: -1px;
+}
+
+#input-container.multiline {
+  border-color: white;
+}
+
+#input-container.multiline > #prompt {
+  visibility: hidden;
+}
+
+#input-container.chrome > #prompt {
+  color: #F06;
+}
+
+#input-container.chrome.multiline {
+  border-color: #F06;
+}
+
 #output-container {
   margin-left: 10px;
 }
 
 #completion-candidates {
   margin-left: 15px;
+  color: #7a8a99;
+  font-size: 12px;
 }
 
 #object-tree {
-  font-family: monospace;
-  background: #131c26;
-  color: #8fa1b2;
   border: 0;
   -moz-appearance: none;
   margin-left: 0;

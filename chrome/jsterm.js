@@ -5,15 +5,13 @@ Cu.import("resource:///modules/WebConsoleUtils.jsm");
 
 /**
  * Todo
- * . change style on multiline
- * . change font
  * . ctrl-c should copy the output selection if any
  * . delete listeners & map
  * . checkbox status
- * . multiline history
- * . chrome mode
  * . use getLineDelimiter
  * . Complete on keywords (function)
+ * . console.log
+ * . save history and share it
  */
 
 const JSTERM_MARK = "orion.annotation.jstermobject";
@@ -23,22 +21,47 @@ let JSTermUI = {
   output: new SourceEditor(),
   objects: new Map(),
 
+  registerCommands: function() {
+    this.commands = [
+      {name: ":chrome", help: "switch to Chrome mode",
+       exec: this.switchToChromeMode.bind(this)},
+      {name: ":content", help: "switch to Content mode",
+       exec: this.switchToContentMode.bind(this)},
+      {name: ":clear", help: "clear screen",
+       exec: this.clear.bind(this)},
+      {name: ":help", help: "show this help",
+       exec: this.help.bind(this)},
+    ];
+  },
+
+  get multiline() {
+    return this.inputContainer.classList.contains("multiline");
+  },
+
+  set multiline(val) {
+    if (val)
+      this.inputContainer.classList.add("multiline");
+    else
+      this.inputContainer.classList.remove("multiline");
+  },
+
   focus: function() {
     this.input.focus();
   },
 
   init: function() {
     this.content = window.parent.gBrowser.contentWindow;
-    this.sb = Cu.Sandbox(this.content, {sandboxPrototype: this.content, wantXrays: false});
+    this.chrome = window.parent;
+
+    this.registerCommands();
 
     this.handleKeys = this.handleKeys.bind(this);
     this.handleClick = this.handleClick.bind(this);
-    this.hideObjInspector = this.hideObjInspector.bind(this);
     this.focus = this.focus.bind(this);
     this.container = document.querySelector("#editors-container");
 
     let outputContainer = document.querySelector("#output-container");
-    let inputContainer = document.querySelector("#input-container");
+    this.inputContainer = document.querySelector("#input-container");
     this.output.init(outputContainer, {
       initialText: "/**\n * 'Shift-Return' to toggle multiline-mode\n */\n",
       mode: SourceEditor.MODES.JAVASCRIPT,
@@ -46,7 +69,7 @@ let JSTermUI = {
       theme: "chrome://jsterm/content/orion.css",
     }, this.initOutput.bind(this));
 
-    this.input.init(inputContainer, {
+    this.input.init(this.inputContainer, {
       mode: SourceEditor.MODES.JAVASCRIPT,
       keys: [{action: "Clear output",
              code: Ci.nsIDOMKeyEvent.DOM_VK_L,
@@ -57,24 +80,41 @@ let JSTermUI = {
 
   },
 
+  switchToChromeMode: function() {
+    let label = document.querySelector("#completion-candidates > label");
+    this.sb = Cu.Sandbox(this.chrome, {sandboxPrototype: this.chrome, wantXrays: false});
+    this.output.setText("\n:chrome // Switched to chrome mode.", this.output.getCharCount());
+    if (this.completion) this.completion.destroy();
+    this.completion = new JSCompletion(this.input, label, this.sb);
+    this.inputContainer.classList.add("chrome");
+  },
+
+  switchToContentMode: function() {
+    let label = document.querySelector("#completion-candidates > label");
+    let needMessage = !!this.sb;
+    this.sb = Cu.Sandbox(this.content, {sandboxPrototype: this.content, wantXrays: false});
+    if (this.completion) this.completion.destroy();
+    this.completion = new JSCompletion(this.input, label, this.sb);
+    if (needMessage) {
+      this.output.setText("\n:content // Switched to content mode.", this.output.getCharCount());
+    }
+    this.inputContainer.classList.remove("chrome");
+  },
+
   initOutput: function() {
     this.makeEditorFitContent(this.output);
     this.ensureInputIsAlwaysVisible(this.output);
     this.output._annotationStyler.addAnnotationType(JSTERM_MARK);
     this.output.editorElement.addEventListener("click", this.handleClick, true);
     this.output.editorElement.addEventListener("keydown", this.focus, true);
-    this.output.addEventListener("focus", this.hideObjInspector, true);
   },
 
   initInput: function() {
     this.history.init();
-
-    let label = document.querySelector("#completion-candidates > label");
-    this.completion = new JSCompletion(this.input, label, this.sb);
+    this.switchToContentMode();
 
     this.makeEditorFitContent(this.input);
     this.ensureInputIsAlwaysVisible(this.input);
-    this.input.editorElement.addEventListener("focus", this.hideObjInspector, true);
     this.input.editorElement.addEventListener("keydown", this.handleKeys, true);
     this.input.editorElement.ownerDocument.defaultView.setTimeout(function() {
       this.input.focus();
@@ -105,14 +145,13 @@ let JSTermUI = {
     cursor: 0,
     browsing: false,
     init: function() {
-      JSTermUI.input.addEventListener(SourceEditor.EVENTS.TEXT_CHANGED, function() {
+      JSTermUI.input.addEventListener(SourceEditor.EVENTS.SELECTION, function() {
         this.browsing = false;
       }.bind(this));
 
     },
     add: function(entry) {
       if (!entry) return;
-      if (JSTermUI.isMultiline(entry)) return;
       if (this._entries.length) {
         let lastEntry = this._entries[this._entries.length - 1];
         if (lastEntry == entry)
@@ -129,16 +168,28 @@ let JSTermUI = {
     goBack: function() {
       if (this.canGoBack()) {
         this.cursor--;
-        JSTermUI.input.setText(this.getEntryAtIndex(this.cursor));
+        let entry = this.getEntryAtIndex(this.cursor);
+        JSTermUI.input.setText(entry);
         JSTermUI.input.setCaretPosition(JSTermUI.input.getLineCount(), 1000);
+        if (JSTermUI.isMultiline(entry)) {
+          JSTermUI.multiline = true;
+        } else {
+          JSTermUI.multiline = false;
+        }
         this.browsing = true;
       }
     },
     goForward: function() {
       if (this.canGoForward()) {
         this.cursor++;
-        JSTermUI.input.setText(this.getEntryAtIndex(this.cursor));
+        let entry = this.getEntryAtIndex(this.cursor);
+        JSTermUI.input.setText(entry);
         JSTermUI.input.setCaretPosition(JSTermUI.input.getLineCount(), 1000);
+        if (JSTermUI.isMultiline(entry)) {
+          JSTermUI.multiline = true;
+        } else {
+          JSTermUI.multiline = false;
+        }
         this.browsing = true;
       }
     },
@@ -165,19 +216,14 @@ let JSTermUI = {
   newEntry: function(code) {
     this.history.add(code);
     this.input.setText("");
+    this.multiline = false;
 
-    let lastLineCount = this.output.getLineCount();
-
-    if (code == ":clear") {
-      this.clear();
-      return;
+    for (let cmd of this.commands) {
+      if (cmd.name == code) {
+        cmd.exec();
+        return;
+      }
     }
-
-    if (code == ":help") {
-      this.output.setText("\n// Help: FIXME", this.output.getCharCount());
-      return;
-    }
-
 
     let error, result;
     try {
@@ -188,11 +234,10 @@ let JSTermUI = {
 
     if (error) {
       error = error.toString();
-      if (this.isMultiline(error)) {
-
+      if (this.isMultiline(error) || this.isMultiline(code)) {
         this.output.setText("\n" + code + "\n/* error:\n" + error + "\n*/", this.output.getCharCount());
       } else {
-        this.output.setText("\n" + code + "\n// error: " + error, this.output.getCharCount());
+        this.output.setText("\n" + code + " // error: " + error, this.output.getCharCount());
       }
     } else {
       if ((typeof result) == "string") {
@@ -202,27 +247,33 @@ let JSTermUI = {
         result = "undefined";
       }
 
-      let lastLineCount = this.output.getLineCount();
-      let isAnObject = ((typeof result) == "object");
-
-      let objectAtLine = null;
 
       let resultStr = result.toString();
 
-      if (isAnObject)
-        resultStr = "// " + resultStr;
       if (code == resultStr) {
         this.output.setText("\n" + code, this.output.getCharCount());
       } else if (code) {
-        this.output.setText("\n" + code + "\n" + resultStr, this.output.getCharCount());
-        if (isAnObject) objectAtLine = lastLineCount + 1;
+        if (this.isMultiline(code)) {
+          if (this.isMultiline(resultStr)) {
+            this.output.setText("\n" + code + "\n/*\n" + resultStr + "\n*/", this.output.getCharCount());
+          } else {
+            this.output.setText("\n" + code + "\n// " + resultStr, this.output.getCharCount());
+          }
+        } else {
+          if (this.isMultiline(resultStr)) {
+            this.output.setText("\n" + code + "\n/*\n" + resultStr + "\n*/", this.output.getCharCount());
+          } else {
+            this.output.setText("\n" + code + " // " + resultStr, this.output.getCharCount());
+          }
+        }
+        let isAnObject = (typeof result) == "object";
+        if (isAnObject) {
+          let line = this.output.getLineCount() - 1;
+          this.objects.set(line, result);
+          this.markRange(line);
+        }
       } else {
         this.output.setText("\n", this.output.getCharCount());
-      }
-
-      if (isAnObject) {
-        this.objects.set(objectAtLine, result);
-        this.markRange(objectAtLine);
       }
     }
   },
@@ -232,29 +283,66 @@ let JSTermUI = {
   },
 
   clear: function() {
+    this.objects = new Map();
     this.output.setText("");
+    this.hideObjInspector();
+  },
+
+  help: function() {
+    let text = "\n:help\n/**";
+    text += "\n * 'Return' to evaluate line,";
+    text += "\n * 'Shift+Return' to enter multiline mode,";
+    text += "\n * 'Shift+Return' to valide multiline content,";
+    text += "\n * 'Tab' for autocompletion,";
+    text += "\n * 'up/down' to browser history,";
+    text += "\n * ";
+    text += "\n * Commands:";
+    for (let cmd of this.commands) {
+      text += "\n *   " + cmd.name + " - " + cmd.help;
+    }
+    text += "\n */";
+    this.output.setText(text, this.output.getCharCount());
   },
 
   handleKeys: function(e) {
     let code = this.input.getText();
-    let isMultiline = this.isMultiline(code);
-    if (e.keyCode == 13 && ((!e.shiftKey && !isMultiline) || (e.shiftKey && isMultiline))) { // ENTER
-      e.stopPropagation();
-      e.preventDefault();
-     this.newEntry(code);
-    }
-    if (!isMultiline && e.keyCode == 38) {
-      e.stopPropagation();
-      e.preventDefault();
-      if (!this.history.browsing) this.history.startBrowsing(this.input.getText());
-      this.history.goBack();
-    }
-    if (!isMultiline && e.keyCode == 40) {
-      e.stopPropagation();
-      e.preventDefault();
-      this.history.goForward();
+
+    if (e.keyCode == 13 && e.shiftKey) {
+      if (!this.multiline) {
+        this.multiline = true;
+      } else {
+        this.multiline = false;
+        e.preventDefault();
+        e.stopPropagation()
+        this.newEntry(code);
+      }
+      return;
     }
 
+    if (!this.multiline && e.keyCode == 13) {
+      e.stopPropagation();
+      e.preventDefault();
+      this.newEntry(code);
+    }
+
+    if (e.keyCode == 38) {
+      if (!this.history.browsing && this.multiline) {
+        return;
+      }
+      e.stopPropagation();
+      e.preventDefault();
+      if (!this.history.browsing) {
+        this.history.startBrowsing(this.input.getText());
+      }
+      this.history.goBack();
+    }
+    if (e.keyCode == 40) {
+      if (this.history.browsing) {
+        e.stopPropagation();
+        e.preventDefault();
+        this.history.goForward();
+      }
+    }
   },
 
   handleClick: function(e) {
@@ -293,6 +381,7 @@ let JSTermUI = {
     let tree = document.querySelector("#object-tree");
     tree.hidden = false;
     tree.view = treeview;
+    this.focus();
   },
 
   hideObjInspector: function() {
@@ -348,7 +437,21 @@ JSCompletion.prototype = {
 
     let root = line.substr(0, caret.col);
 
-    let candidates = JSPropertyProvider(this.sb, root);
+    let candidates;
+    if (root[0] == ":") {
+      candidates = {
+        matchProp: root,
+        matches: [],
+      };
+      for (let cmd of JSTermUI.commands) {
+        if (cmd.name.indexOf(root) == 0) {
+          candidates.matches.push(cmd.name);
+        }
+      }
+    } else {
+      candidates = JSPropertyProvider(this.sb, root);
+    }
+
     if (!candidates || candidates.matches.length == 0) return;
 
     let offset = this.editor.getCaretOffset();

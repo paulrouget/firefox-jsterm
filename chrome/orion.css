@@ -8,11 +8,12 @@
 }
 
 .viewContainer {
-  font-family: monospace;
+  font-family: Monaco, monospace;
+  font-weight: lighter;
 }
 
 .view {
-  color: #8fa1b2; /* Default text color */
+  color: #FFF; /* Default text color */
   padding-left: 4px;
 }
 
@@ -47,77 +48,22 @@
   cursor: pointer;
 }
 
-.token_singleline_comment {
-  color: #5c6773; /* green */
-}
-
+.token_doc_comment,
+.token_singleline_comment,
 .token_multiline_comment {
-  color: #5c6773; /* green */
-}
-
-.token_doc_comment {
-  color: #5c6773; /* green */
-}
-
-.token_doc_html_markup {
-  color: #a673bf; /* purple */
-}
-
-.token_doc_tag {
-  color: #a673bf; /* purple */
-}
-
-.token_task_tag { /* "TODO" */
-  color: black;
-  background: yellow;
+  color: #5c6773;
 }
 
 .token_string {
-  color: #3689b2; /* blue */
+  color: #3689b2;
 }
 
 .token_keyword {
-  color: #a673bf; /* purple */
-}
-
-.token_space {
-  /* images/white_space.png */
-  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAkAAAAJCAIAAABv85FHAAAABnRSTlMA/wAAAACkwsAdAAAAIUlEQVR4nGP4z8CAC+GUIEXuABhgkTuABEiRw2cmae4EAH05X7xDolNRAAAAAElFTkSuQmCC");
-  background-repeat: no-repeat;
-  background-position: center center;
-}
-
-.token_tab {
-  /* images/white_tab.png */
-  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAJCAIAAACJ2loDAAAABnRSTlMA/wD/AP83WBt9AAAAMklEQVR4nGP4TwRgoK6i52c3bz5w6zMSA6tJn28d2Lx589nnCAYu63AaSLxJRLoJPwAAeNk0aG4opfMAAAAASUVORK5CYII=");
-  background-repeat: no-repeat;
-  background-position: left center;
-}
-
-/* Styling for html syntax highlighting */
-.entity-name-tag {
-  color: #a673bf; /* purple */
-}
-
-.entity-other-attribute-name {
-  color: #a673bf; /* purple */
-}
-
-.punctuation-definition-comment {
-  color: #45a946; /* green */
-}
-
-.comment {
-  color: #45a946; /* green */
-}
-
-.string-quoted {
-  color: #1e66b1; /* blue */
-  font-style: italic;
+  color: #a673bf;
+  color: #F06;
 }
 
 .invalid {
   color: red;
-  font-weight: bold;
 }
 

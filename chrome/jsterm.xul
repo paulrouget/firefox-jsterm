@@ -24,10 +24,10 @@
       </vbox>
     </vbox>
     <splitter class="devtools-side-splitter"/>
-    <tree hidden="true" flex="1" hidecolumnpicker="true" id="object-tree">
+    <tree hidden="true" width="300" hidecolumnpicker="true" id="object-tree">
       <treecols>
-        <treecol hideheader="true" id="propName" primary="true" flex="1"/>
-        <treecol hideheader="true" id="propValue" flex="1"/>
+        <treecol hideheader="true" id="propName" primary="true" flex="3"/>
+        <treecol hideheader="true" id="propValue" flex="2"/>
       </treecols>
       <treechildren/>
     </tree>
