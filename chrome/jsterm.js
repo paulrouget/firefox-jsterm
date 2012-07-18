@@ -10,8 +10,11 @@ Cu.import("resource:///modules/WebConsoleUtils.jsm");
  * . checkbox status
  * . use getLineDelimiter
  * . Complete on keywords (function)
- * . console.log
+ * . highlight common DOM keywords
+ * . console.log / print()
  * . save history and share it
+ * . better enter/shift-enter thing
+ * . overflow-x
  */
 
 const JSTERM_MARK = "orion.annotation.jstermobject";
@@ -63,7 +66,7 @@ let JSTermUI = {
     let outputContainer = document.querySelector("#output-container");
     this.inputContainer = document.querySelector("#input-container");
     this.output.init(outputContainer, {
-      initialText: "/**\n * 'Shift-Return' to toggle multiline-mode\n */\n",
+      initialText: "// type ':help' for help",
       mode: SourceEditor.MODES.JAVASCRIPT,
       readOnly: true,
       theme: "chrome://jsterm/content/orion.css",
@@ -82,7 +85,7 @@ let JSTermUI = {
 
   switchToChromeMode: function() {
     let label = document.querySelector("#completion-candidates > label");
-    this.sb = Cu.Sandbox(this.chrome, {sandboxPrototype: this.chrome, wantXrays: false});
+    this.sb = this.buildSandbox(this.chrome);
     this.output.setText("\n:chrome // Switched to chrome mode.", this.output.getCharCount());
     if (this.completion) this.completion.destroy();
     this.completion = new JSCompletion(this.input, label, this.sb);
@@ -92,13 +95,21 @@ let JSTermUI = {
   switchToContentMode: function() {
     let label = document.querySelector("#completion-candidates > label");
     let needMessage = !!this.sb;
-    this.sb = Cu.Sandbox(this.content, {sandboxPrototype: this.content, wantXrays: false});
+    this.sb = this.buildSandbox(this.content);
     if (this.completion) this.completion.destroy();
     this.completion = new JSCompletion(this.input, label, this.sb);
     if (needMessage) {
       this.output.setText("\n:content // Switched to content mode.", this.output.getCharCount());
     }
     this.inputContainer.classList.remove("chrome");
+  },
+
+  buildSandbox: function(win) {
+    let sb = Cu.Sandbox(win, {sandboxPrototype: win, wantXrays: false});
+    sb.print = function(msg) {
+      dump(msg + "\n");
+    }
+    return sb;
   },
 
   initOutput: function() {
@@ -248,7 +259,12 @@ let JSTermUI = {
       }
 
 
+      let isAnObject = (typeof result) == "object";
       let resultStr = result.toString();
+
+      if (isAnObject) {
+        resultStr += " (click to inspect)";
+      }
 
       if (code == resultStr) {
         this.output.setText("\n" + code, this.output.getCharCount());
@@ -266,7 +282,6 @@ let JSTermUI = {
             this.output.setText("\n" + code + " // " + resultStr, this.output.getCharCount());
           }
         }
-        let isAnObject = (typeof result) == "object";
         if (isAnObject) {
           let line = this.output.getLineCount() - 1;
           this.objects.set(line, result);
@@ -290,9 +305,8 @@ let JSTermUI = {
 
   help: function() {
     let text = "\n:help\n/**";
-    text += "\n * 'Return' to evaluate line,";
-    text += "\n * 'Shift+Return' to enter multiline mode,";
-    text += "\n * 'Shift+Return' to valide multiline content,";
+    text += "\n * 'Return' to evaluate entry,";
+    text += "\n * 'Shift+Return' to add a line,";
     text += "\n * 'Tab' for autocompletion,";
     text += "\n * 'up/down' to browser history,";
     text += "\n * ";
@@ -308,18 +322,11 @@ let JSTermUI = {
     let code = this.input.getText();
 
     if (e.keyCode == 13 && e.shiftKey) {
-      if (!this.multiline) {
-        this.multiline = true;
-      } else {
-        this.multiline = false;
-        e.preventDefault();
-        e.stopPropagation()
-        this.newEntry(code);
-      }
+      this.multiline = true;
       return;
     }
 
-    if (!this.multiline && e.keyCode == 13) {
+    if (e.keyCode == 13) {
       e.stopPropagation();
       e.preventDefault();
       this.newEntry(code);
@@ -466,11 +473,11 @@ JSCompletion.prototype = {
     // if several candidate
 
     let commonPrefix = candidates.matches.reduce(function(commonPrefix, nextValue) {
-      if (!commonPrefix)
-        return nextValue;
-
       if (commonPrefix == "")
         return "";
+
+      if (!commonPrefix)
+        return nextValue;
 
       if (commonPrefix.length > nextValue.length) {
         commonPrefix = commonPrefix.substr(0, nextValue.length);

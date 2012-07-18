@@ -43,8 +43,12 @@
   text-align: start;
 }
 
-.annotationLine.object > span:first-of-type {
-  text-decoration: underline;
+.annotationLine.object {
+  /*
+    text-decoration: underline;
+    -moz-text-decoration-color: grey;
+    -moz-text-decoration-style: dotted;
+  */
   cursor: pointer;
 }
 

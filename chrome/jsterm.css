@@ -10,11 +10,12 @@ window {
   color: #8fa1b2;
   font-family: Monaco, monospace;
   font-weight: lighter;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 #editors-container {
   padding: 5px;
+  overflow-y: auto;
 }
 
 #prompt {

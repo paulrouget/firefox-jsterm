@@ -15,7 +15,7 @@
   <script type="application/javascript" src="jsterm.js"/>
   <hbox flex="1">
     <vbox flex="1">
-      <vbox id="editors-container" flex="1" style="overflow-y:auto" onclick="JSTermUI.focus()">
+      <vbox id="editors-container" flex="1" onclick="JSTermUI.focus()">
         <hbox flex="1" id="output-container"/>
         <hbox flex="1" id="input-container"><label id="prompt" value="▸"/></hbox>
       </vbox>
