@@ -19,11 +19,13 @@ function startup() {
           window.removeEventListener("load", winWatcherLoad, false);
           if (isBrowserWindow(window)) {
             JSTermManager.addControlsToWindow(window);
+            JSTermManager.trackTabs(window);
             trackedWindows.add(window);
           }
         }, false);
       } else if (aTopic == "domwindowclosed") {
         let window = aSubject.QueryInterface(Ci.nsIDOMWindow);
+        JSTermManager.untrackTabs(window);
         trackedWindows.delete(window);
       }
     },
@@ -40,6 +42,7 @@ function startup() {
     let window = winEnum.getNext().QueryInterface(Ci.nsIDOMWindow);
     if (isBrowserWindow(window)) {
       JSTermManager.addControlsToWindow(window);
+      JSTermManager.trackTabs(window);
       trackedWindows.add(window);
     }
   }
@@ -53,6 +56,7 @@ function shutdown() {
     let window = winEnum.getNext().QueryInterface(Ci.nsIDOMWindow);
     if (trackedWindows && trackedWindows.has(window)) {
       JSTermManager.removeControlsFromWindow(window);
+      JSTermManager.untrackTabs(window);
       for (let b of window.gBrowser.browsers) {
         JSTermManager.closeForBrowser(b);
       }
@@ -69,6 +73,7 @@ function uninstall() {}
 
 let JSTermManager = {
   _map: new WeakMap(),
+  _listeners: new WeakMap(),
 
   addControlsToWindow: function(aWindow) {
     let doc = aWindow.document;
@@ -89,6 +94,24 @@ let JSTermManager = {
     let button = aWindow.document.querySelector("#developer-toolbar-jsterm");
     button.parentNode.removeChild(button);
   },
+  trackTabs: function(aWindow) {
+    let tabs = aWindow.gBrowser.tabContainer;
+    let update = this.updateCheckboxStatus.bind(this, aWindow);
+    tabs.addEventListener("TabSelect", update, true);
+    this._listeners.set(aWindow, update);
+    aWindow.addEventListener("unload", function onClose(aEvent) {
+      tabs.removeEventListener("TabSelect", update, true);
+      aWindow.removeEventListener("unload", onClose, false);
+    }, false);
+  },
+  untrackTabs: function(aWindow) {
+    let tabs = aWindow.gBrowser.tabContainer;
+    let update = this._listeners.get(aWindow);
+    if (update) {
+      this._listeners.delete(aWindow);
+      tabs.removeEventListener("TabSelect", update, true);
+    }
+  },
   isOpenForBrowser: function(aBrowser) {
     return this._map.has(aBrowser);
   },
@@ -104,7 +127,7 @@ let JSTermManager = {
       return;
     let term = new JSTerm(aBrowser);
     this._map.set(aBrowser, term);
-    this.updateCheckboxStatus(aBrowser);
+    this.updateCheckboxStatus(aBrowser.ownerDocument.defaultView);
   },
   closeForBrowser: function(aBrowser) {
     let term = this._map.get(aBrowser);
@@ -112,9 +135,16 @@ let JSTermManager = {
       return;
     term.destroy();
     this._map.delete(aBrowser);
-    this.updateCheckboxStatus(aBrowser);
+    this.updateCheckboxStatus(aBrowser.ownerDocument.defaultView);
   },
-  updateCheckboxStatus: function(aBrowser) {
+  updateCheckboxStatus: function(aWindow) {
+    let selectedBrowser = aWindow.gBrowser.selectedBrowser;
+    let checked = this.isOpenForBrowser(selectedBrowser);
+    let button = aWindow.document.querySelector("#developer-toolbar-jsterm");
+    if (checked)
+      button.setAttribute("checked", "true");
+    else
+      button.setAttribute("checked", "false");
   },
 }
 

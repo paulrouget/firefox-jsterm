@@ -5,12 +5,12 @@ Cu.import("resource:///modules/WebConsoleUtils.jsm");
 
 /**
  * Todo
- * . ctrl-c should copy the output selection if any
- * . delete listeners & map
  * . checkbox status
- * . highlight common DOM keywords
+ * . undock
  * . save history and share it
+ * . ctrl-c should copy the output selection if any
  * . make tree width persistent
+ * . delete listeners & map
  */
 
 const JSTERM_MARK = "orion.annotation.jstermobject";
@@ -252,6 +252,11 @@ let JSTermUI = {
       error = ex;
     }
 
+    this.dumpEntryResult(result, error, code);
+
+  },
+
+  dumpEntryResult: function(result, error, code) {
     if (error) {
       error = error.toString();
       if (this.isMultiline(error) || this.isMultiline(code) || this.printedSomething) {
@@ -259,48 +264,50 @@ let JSTermUI = {
       } else {
         this.output.setText(" // error: " + error, this.output.getCharCount());
       }
+      return;
+    }
+
+    let isAnObject = (typeof result) == "object";
+    let isAFunction = (typeof result) == "function";
+
+    let resultStr;
+    if (result == undefined) {
+      resultStr = "undefined";
+    } else if ((typeof result) == "string") {
+      resultStr = "\"" + result + "\"";
     } else {
-      if ((typeof result) == "string") {
-        result = "\"" + result + "\"";
-      }
+      resultStr = result.toString();
+    }
 
-      let isAnObject = (typeof result) == "object";
-      let resultStr;
+    if (code == resultStr ||
+        (result == undefined && this.printedSomething)) {
+      return;
+    }
 
-      if (result == undefined) {
-        resultStr = "undefined";
+    if (isAnObject) {
+      resultStr += " [+]";
+    }
+
+    if (this.isMultiline(resultStr)) {
+      if (!isAFunction) {
+        resultStr = "\n/*\n" + resultStr + "\n*/";
       } else {
-        resultStr = result.toString();
+        resultStr = "\n" + resultStr;
       }
-
-      if (isAnObject) {
-        resultStr += " [+]";
-      }
-
-      if (code == resultStr) {
-        // Do nothing
+    } else {
+      if (this.isMultiline(code) || this.printedSomething) {
+        resultStr = "\n// " + resultStr;
       } else {
-        if (this.isMultiline(code) || this.printedSomething) {
-          if (result == undefined && this.printedSomething) {
-            // Do nothing. I don't think it's interesting to print "undefined" in this case.
-          } else if (this.isMultiline(resultStr)) {
-            this.output.setText("\n/*\n" + resultStr + "\n*/", this.output.getCharCount());
-          } else {
-            this.output.setText("\n// " + resultStr, this.output.getCharCount());
-          }
-        } else {
-          if (this.isMultiline(resultStr)) {
-            this.output.setText("\n/*\n" + resultStr + "\n*/", this.output.getCharCount());
-          } else {
-            this.output.setText(" // " + resultStr, this.output.getCharCount());
-          }
-        }
-        if (isAnObject) {
-          let line = this.output.getLineCount() - 1;
-          this.objects.set(line, result);
-          this.markRange(line);
-        }
+        resultStr = " // " + resultStr;
       }
+    }
+
+    this.output.setText(resultStr, this.output.getCharCount());
+
+    if (isAnObject) {
+      let line = this.output.getLineCount() - 1;
+      this.objects.set(line, result);
+      this.markRange(line);
     }
   },
 
