@@ -5,12 +5,13 @@ Cu.import("resource:///modules/WebConsoleUtils.jsm");
 
 /**
  * Todo
- * . checkbox status
+ * . Use a broadcaster (and key binding)
+ * . print() is slow
  * . undock
  * . save history and share it
- * . ctrl-c should copy the output selection if any
- * . make tree width persistent
+ * . make width/height persistent
  * . delete listeners & map
+ * . underline the current autocompletion item
  */
 
 const JSTERM_MARK = "orion.annotation.jstermobject";
@@ -70,7 +71,7 @@ let JSTermUI = {
     let outputContainer = document.querySelector("#output-container");
     this.inputContainer = document.querySelector("#input-container");
     this.output.init(outputContainer, {
-      initialText: "// type ':help' for help",
+      initialText: "// type ':help' for help\n// Report bug here: https://github.com/paulrouget/firefox-jsterm",
       mode: SourceEditor.MODES.JAVASCRIPT,
       readOnly: true,
       theme: "chrome://jsterm/content/orion.css",
@@ -106,6 +107,7 @@ let JSTermUI = {
 
   buildSandbox: function(win) {
     let sb = Cu.Sandbox(win, {sandboxPrototype: win, wantXrays: false});
+    this.target = win;
     sb.print = function(msg) {
       this.printedSomething = true;
       this.output.setText("\n" + msg, this.output.getCharCount());
@@ -118,7 +120,7 @@ let JSTermUI = {
     this.ensureInputIsAlwaysVisible(this.output);
     this.output._annotationStyler.addAnnotationType(JSTERM_MARK);
     this.output.editorElement.addEventListener("click", this.handleClick, true);
-    this.output.editorElement.addEventListener("keydown", this.focus, true);
+    this.output.editorElement.addEventListener("keyup", this.focus, true);
   },
 
   initInput: function() {
@@ -128,6 +130,12 @@ let JSTermUI = {
     this.makeEditorFitContent(this.input);
     this.ensureInputIsAlwaysVisible(this.input);
     this.input.editorElement.addEventListener("keydown", this.handleKeys, true);
+
+
+    this.input.addEventListener(SourceEditor.EVENTS.TEXT_CHANGED, function() {
+      this.multiline = this.isMultiline(this.input.getText());
+    }.bind(this));
+
     this.input.editorElement.ownerDocument.defaultView.setTimeout(function() {
       this.input.focus();
     }.bind(this), 0);
@@ -254,6 +262,13 @@ let JSTermUI = {
 
     this.dumpEntryResult(result, error, code);
 
+    /* Ugly hack to scrollback */
+    this.output.editorElement.contentDocument.querySelector("iframe")
+                             .contentDocument.querySelector(".view").scrollLeft = 0;
+
+    /* Clear Selection if any */
+    let cursor = this.output.getLineStart(this.output.getLineCount() - 1);
+    this.output.setSelection(cursor, cursor);
   },
 
   dumpEntryResult: function(result, error, code) {
@@ -267,14 +282,18 @@ let JSTermUI = {
       return;
     }
 
-    let isAnObject = (typeof result) == "object";
-    let isAFunction = (typeof result) == "function";
+    let isAnArray = Array.isArray(result);
+    let isAnObject = !isAnArray && ((typeof result) == "object");
+    let isAFunction = ((typeof result) == "function");
+    let isAString = (typeof result) == "string";
 
     let resultStr;
     if (result == undefined) {
       resultStr = "undefined";
-    } else if ((typeof result) == "string") {
+    } else if (isAString) {
       resultStr = "\"" + result + "\"";
+    } else if (isAnArray) {
+      resultStr = "[" + result.join(", ") + "]";
     } else {
       resultStr = result.toString();
     }
@@ -332,6 +351,7 @@ let JSTermUI = {
     text += "\n * 'Shift+Return' to evaluate multiline entry,";
     text += "\n * ";
     text += "\n * Use 'print(aString)' to dump text in the terminal,";
+    text += "\n * Click on [+] to inspect an object,";
     text += "\n * ";
     text += "\n * Commands:";
     for (let cmd of this.commands) {
@@ -420,7 +440,6 @@ let JSTermUI = {
 
   destroy: function() {
     this.input.editorElement.removeEventListener("keydown", this.handleKeys, true);
-
     this.completion.destroy();
     this.completion = null;
     this.treeview = null;
