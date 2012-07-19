@@ -5,9 +5,10 @@
     <creator>Paul Rouget</creator>
     <id>jsterm@paulrouget.com</id>
     <name>JavaScript Terminal</name>
-    <version>1</version>
+    <version>1.1</version>
     <bootstrap>true</bootstrap>
     <type>2</type>
+    <iconURL>chrome://jsterm/content/icon.png</iconURL>
     <homepageURL>http://github.com/paulrouget/firefox-jsterm</homepageURL>
     <description>JavaScript Terminal for Firefox</description>
 
@@ -15,8 +16,8 @@
     <targetApplication>
       <r:Description>
         <id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</id>
-        <minVersion>13</minVersion>
-        <maxVersion>16.*</maxVersion>
+        <minVersion>16.0a1</minVersion>
+        <maxVersion>17.0a1</maxVersion>
       </r:Description>
     </targetApplication>
   </r:Description>
