@@ -76,6 +76,7 @@ function uninstall() {}
 let JSTermManager = {
   _map: new WeakMap(),
   _listeners: new WeakMap(),
+  where: "in_browser",
 
   addControlsToWindow: function(aWindow) {
     let strings = Services.strings.createBundle("chrome://jsterm/locale/jsterm.properties");
@@ -186,6 +187,19 @@ let JSTermManager = {
     this._map.delete(aBrowser);
     this.updateCheckboxStatus(aBrowser.ownerDocument.defaultView);
   },
+  moveTermTo: function(aBrowser, aWhere) {
+    this.where = aWhere;
+    let term = this._map.get(aBrowser);
+    if (!term)
+      return;
+    term.rebuildUI();
+  },
+
+  isTermDocked: function(aBrowser) {
+    let term = this._map.get(aBrowser);
+    return term.docked;
+  },
+
   updateCheckboxStatus: function(aWindow) {
     let selectedBrowser = aWindow.gBrowser.selectedBrowser;
     let checked = this.isOpenForBrowser(selectedBrowser);
@@ -197,46 +211,79 @@ let JSTermManager = {
   },
 }
 
-function JSTerm(aBrowser, aManager) {
+function JSTerm(aBrowser) {
   this.browser = aBrowser;
   this.chromeDoc = aBrowser.ownerDocument;
   this.chromeWin = this.chromeDoc.defaultView;
   this.buildUI();
+  this.savedContent = null;
 }
 
 JSTerm.prototype = {
   buildUI: function() {
-    let nbox = this.chromeWin.gBrowser.getNotificationBox(this.browser);
+    const CHROME_URL = "chrome://jsterm/content/jsterm.xul";
+    const CHROME_WINDOW_FLAGS = "chrome,centerscreen,resizable,dialog=no";
+
+    let termWindow;
     let doc = this.chromeDoc;
 
-    let splitter = doc.createElement("splitter");
-    splitter.className = "devtools-horizontal-splitter jsterm-splitter";
+    this.docked = (JSTermManager.where == "in_browser");
 
-    let container = doc.createElement("vbox");
-    container.setAttribute("flex", "1");
-    container.className = "jsterm-container";
-    container.height = 200;
+    if (this.docked) {
+      let nbox = this.chromeWin.gBrowser.getNotificationBox(this.browser);
+      let splitter = doc.createElement("splitter");
+      splitter.className = "devtools-horizontal-splitter jsterm-splitter";
 
-    let iframe = doc.createElement("iframe");
-    iframe.setAttribute("src", "chrome://jsterm/content/jsterm.xul");
-    iframe.setAttribute("flex", "1")
-    container.appendChild(iframe);
-    nbox.appendChild(splitter);
-    nbox.appendChild(container);
+      let container = doc.createElement("vbox");
+      container.setAttribute("flex", "1");
+      container.className = "jsterm-container";
+      container.height = 200;
 
-    iframe.contentWindow.onload = function() {
-      iframe.contentWindow.JSTermUI.init(JSTermManager,
-                                         this.browser,
-                                         this.browser.contentWindow,
-                                         this.chromeWin);
+      let iframe = doc.createElement("iframe");
+      iframe.setAttribute("src", CHROME_URL);
+      iframe.setAttribute("flex", "1")
+
+      container.appendChild(iframe);
+      nbox.appendChild(splitter);
+      nbox.appendChild(container);
+
+      termWindow = iframe.contentWindow;
+    } else {
+      termWindow = Services.ww.openWindow(null, CHROME_URL, "_blank", CHROME_WINDOW_FLAGS, {});
+    }
+
+    termWindow.onload = function() {
+      termWindow.JSTermUI.init(JSTermManager,
+                               this.browser,
+                               this.browser.contentWindow,
+                               this.chromeWin,
+                               this.savedContent);
     }.bind(this);
+
+    this.termWindow = termWindow;
   },
-  destroy: function() {
+
+  rebuildUI: function() {
+    this.savedContent = this.termWindow.JSTermUI.getContent();
+    this.destroyUI();
+    this.buildUI();
+  },
+
+  destroyUI: function() {
     let nbox = this.chromeWin.gBrowser.getNotificationBox(this.browser);
     let container = nbox.querySelector(".jsterm-container");
-    let splitter = nbox.querySelector(".jsterm-splitter");
-    splitter.parentNode.removeChild(splitter);
-    container.parentNode.removeChild(container);
+    if (container) {
+      let splitter = nbox.querySelector(".jsterm-splitter");
+      splitter.parentNode.removeChild(splitter);
+      container.parentNode.removeChild(container);
+    } else {
+      this.termWindow.close()
+    }
+  },
+
+  destroy: function() {
+    this.destroyUI();
+    this.termWindow = null;
     this.browser = null;
     this.chromeDoc = null;
     this.chromeWin = null;

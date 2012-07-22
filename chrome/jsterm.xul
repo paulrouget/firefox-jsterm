@@ -2,6 +2,11 @@
 <?xml-stylesheet href="chrome://browser/skin/devtools/common.css" type="text/css"?>
 <?xml-stylesheet href="chrome://jsterm/content/jsterm.css" type="text/css"?>
 
+<!DOCTYPE window [
+<!ENTITY % JSTermDTD SYSTEM "chrome://jsterm/locale/jsterm.dtd" >
+ %JSTermDTD;
+]>
+
 <window id="jsterm-window"
         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
         title="JSTerm"
@@ -9,9 +14,18 @@
         macanimationtype="document"
         screenX="4" screenY="4"
         width="640" height="480"
+        onunload="JSTermUI.closeIfInWindow()"
         persist="screenX screenY width height sizemode">
 
   <script type="application/javascript" src="jsterm.js"/>
+
+  <keyset id="jsterm-keyset">
+    <key id="jsterm-key-close"
+         key="&JSTerm.closeKey;"
+         oncommand="JSTermUI.closeIfInWindow()"
+         modifiers="accel"/>
+  </keyset>
+
   <hbox flex="1">
     <vbox flex="1">
       <vbox id="editors-container" flex="1" onclick="JSTermUI.focus()">

@@ -5,6 +5,9 @@ Cu.import("resource:///modules/WebConsoleUtils.jsm");
 
 /**
  * Todo
+ * . ctrl-w & keybinding doesn't work in window mode
+ * . using the close button doesn't uncheck the button
+ * . keybindings for linux & windows
  * . print() is slow
  * . undock
  * . save history and share it
@@ -21,7 +24,15 @@ let JSTermUI = {
   objects: new Map(),
 
   close: function() {
+    if (this.closing) return;
+    this.closing = true;
     this.manager.closeForBrowser(this.browser);
+  },
+
+  closeIfInWindow: function() {
+    if (!this.closing && !this.manager.isTermDocked(this.browser)) {
+      this.close();
+    }
   },
 
   registerCommands: function() {
@@ -36,6 +47,10 @@ let JSTermUI = {
        exec: this.switchToContentMode.bind(this)},
       {name: ":chrome", help: "switch to Chrome mode",
        exec: this.switchToChromeMode.bind(this)},
+      {name: ":undock", help: "Move the terminal into its own window",
+       exec: this.undock.bind(this)},
+      {name: ":dock", help: "Move the terminal in browser",
+       exec: this.dock.bind(this)},
     ];
   },
 
@@ -54,7 +69,7 @@ let JSTermUI = {
     this.input.focus();
   },
 
-  init: function(aManager, aBrowser, aContent, aChrome) {
+  init: function(aManager, aBrowser, aContent, aChrome, aDefaultContent) {
     this.manager = aManager;
     this.browser = aBrowser;
     this.content = aContent;
@@ -67,16 +82,29 @@ let JSTermUI = {
     this.focus = this.focus.bind(this);
     this.container = document.querySelector("#editors-container");
 
+    let defaultInputText, defaultOutputText;
+
+    if (aDefaultContent) {
+      defaultInputText = aDefaultContent.input;
+      defaultOutputText = aDefaultContent.output;
+      this.history.init(aDefaultContent.history);
+    } else {
+      defaultInputText = "";
+      defaultOutputText = "// type ':help' for help\n// Report bug here: https://github.com/paulrouget/firefox-jsterm";
+      this.history.init();
+    }
+
     let outputContainer = document.querySelector("#output-container");
     this.inputContainer = document.querySelector("#input-container");
     this.output.init(outputContainer, {
-      initialText: "// type ':help' for help\n// Report bug here: https://github.com/paulrouget/firefox-jsterm",
+      initialText: defaultOutputText,
       mode: SourceEditor.MODES.JAVASCRIPT,
       readOnly: true,
       theme: "chrome://jsterm/content/orion.css",
     }, this.initOutput.bind(this));
 
     this.input.init(this.inputContainer, {
+      initialText: defaultInputText,
       mode: SourceEditor.MODES.JAVASCRIPT,
       theme: "chrome://jsterm/content/orion.css",
     }, this.initInput.bind(this));
@@ -90,6 +118,7 @@ let JSTermUI = {
     if (this.completion) this.completion.destroy();
     this.completion = new JSCompletion(this.input, label, this.sb);
     this.inputContainer.classList.add("chrome");
+    window.document.title = "JSTerm: (chrome) " + this.chrome.location;
   },
 
   switchToContentMode: function() {
@@ -102,6 +131,7 @@ let JSTermUI = {
       this.output.setText(" // Switched to content mode.", this.output.getCharCount());
     }
     this.inputContainer.classList.remove("chrome");
+    window.document.title = "JSTerm: " + this.content.location;
   },
 
   buildSandbox: function(win) {
@@ -123,7 +153,6 @@ let JSTermUI = {
   },
 
   initInput: function() {
-    this.history.init();
     this.switchToContentMode();
 
     this.makeEditorFitContent(this.input);
@@ -163,11 +192,16 @@ let JSTermUI = {
     _entries: [],
     cursor: 0,
     browsing: false,
-    init: function() {
+    init: function(entries) {
       JSTermUI.input.addEventListener(SourceEditor.EVENTS.SELECTION, function() {
         this.browsing = false;
       }.bind(this));
-
+      if (entries) {
+        this._entries = entries;
+      }
+    },
+    copy: function() {
+      return this._entries.concat();
     },
     add: function(entry) {
       if (!entry) return;
@@ -461,6 +495,26 @@ let JSTermUI = {
 
   filterObjInspector: function(input) {
     this.treeview.filter(input.value);
+  },
+
+  getContent: function() {
+    return {
+      input: this.input.getText(),
+      output: this.output.getText(),
+      history: this.history.copy(),
+    };
+  },
+
+  undock: function() {
+    if (this.manager.isTermDocked(this.browser)) {
+      this.manager.moveTermTo(this.browser, "own_window");
+    }
+  },
+
+  dock: function() {
+    if (!this.manager.isTermDocked(this.browser)) {
+      this.manager.moveTermTo(this.browser, "in_browser");
+    }
   },
 }
 
