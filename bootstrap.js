@@ -2,6 +2,8 @@ const Cu = Components.utils;
 const Cc = Components.classes;
 const Ci = Components.interfaces;
 
+Cu.import("resource://gre/modules/Services.jsm");
+
 let trackedWindows;
 let wObserver;
 
@@ -76,23 +78,69 @@ let JSTermManager = {
   _listeners: new WeakMap(),
 
   addControlsToWindow: function(aWindow) {
+    let strings = Services.strings.createBundle("chrome://jsterm/locale/jsterm.properties");
+
     let doc = aWindow.document;
+
+    aWindow.JSTermManager = this;
+
+    let command = doc.createElement("command");
+    command.id = "Tools:JSTerm";
+    command.setAttribute("oncommand", "JSTermManager.toggleForBrowser(this)");
+    doc.querySelector("#mainCommandSet").appendChild(command);
+
+    let broadcaster = doc.createElement("broadcaster");
+    broadcaster.id = "devtoolsMenuBroadcaster_JSTerm";
+    broadcaster.setAttribute("label", strings.GetStringFromName("JSTerm.menu.label"));
+    broadcaster.setAttribute("type", "checkbox");
+    broadcaster.setAttribute("autocheck", "false");
+    broadcaster.setAttribute("key", "key_JSTerm");
+    broadcaster.setAttribute("command", "Tools:JSTerm");
+    doc.querySelector("#mainBroadcasterSet").appendChild(broadcaster);
+
+    let menubaritem = doc.createElement("menuitem");
+    menubaritem.classList.add("jsterm-addon");
+    menubaritem.id = "menu_JSTerm";
+    menubaritem.setAttribute("observes", "devtoolsMenuBroadcaster_JSTerm");
+    let webConsoleMenu = doc.querySelector("#webConsole");
+    doc.querySelector("#menuWebDeveloperPopup").insertBefore(menubaritem, webConsoleMenu);
+
+    let appmenuPopup = doc.querySelector("#appmenu_webDeveloper_popup");
+    if (appmenuPopup) { // no appmenu on Mac
+      let appmenuitem = doc.createElement("menuitem");
+      appmenuitem.classList.add("jsterm-addon");
+      appmenuitem.id = "appmenu_JSTerm";
+      appmenuitem.setAttribute("observes", "devtoolsMenuBroadcaster_JSTerm");
+      let webConsoleAppMenu = doc.querySelector("#appmenu_webConsole");
+      appmenuPopup.insertBefore(appmenuitem, webConsoleAppMenu);
+    }
+
+    let key = doc.createElement("key");
+    key.classList.add("jsterm-addon");
+    key.id = "key_JSTerm";
+    key.setAttribute("key", strings.GetStringFromName("JSTerm.key"));
+    key.setAttribute("command", "Tools:JSTerm");
+    key.setAttribute("modifiers", "accel,alt")
+    doc.querySelector("#mainKeyset").appendChild(key);
+
     let button = doc.createElement("toolbarbutton");
-    button.setAttribute("label", "JSTerm");
-    button.className = "developer-toolbar-button";
+    button.setAttribute("observes", "devtoolsMenuBroadcaster_JSTerm");
+    button.classList.add("developer-toolbar-button");
+    button.classList.add("jsterm-addon");
     button.id = "developer-toolbar-jsterm";
     button.setAttribute("style", "-moz-image-region: rect(0, 16px, 16px, 0);");
-    button.addEventListener("command", function() {
-      let browser = aWindow.gBrowser.selectedBrowser;
-      this.toggleForBrowser(browser);
-    }.bind(this), true);
-    let toolbar = doc.querySelector("#developer-toolbar");
     let before = doc.querySelector("#developer-toolbar-webconsole");
-    toolbar.insertBefore(button, before);
+    doc.querySelector("#developer-toolbar").insertBefore(button, before);
   },
   removeControlsFromWindow: function(aWindow) {
-    let button = aWindow.document.querySelector("#developer-toolbar-jsterm");
-    button.parentNode.removeChild(button);
+    let elts = aWindow.document.querySelectorAll(".jsterm-addon,#devtoolsMenuBroadcaster_JSTerm");
+    for (let e of elts) {
+      try{
+        e.parentNode.removeChild(e);
+      }catch(e){}
+    }
+    let cmd = aWindow.document.getElementById("Tools:JSTerm");
+    cmd.parentNode.removeChild(cmd);
   },
   trackTabs: function(aWindow) {
     let tabs = aWindow.gBrowser.tabContainer;
@@ -105,9 +153,9 @@ let JSTermManager = {
     }, false);
   },
   untrackTabs: function(aWindow) {
-    let tabs = aWindow.gBrowser.tabContainer;
     let update = this._listeners.get(aWindow);
     if (update) {
+      let tabs = aWindow.gBrowser.tabContainer;
       this._listeners.delete(aWindow);
       tabs.removeEventListener("TabSelect", update, true);
     }
@@ -115,11 +163,12 @@ let JSTermManager = {
   isOpenForBrowser: function(aBrowser) {
     return this._map.has(aBrowser);
   },
-  toggleForBrowser: function(aBrowser) {
-    if (this.isOpenForBrowser(aBrowser)) {
-      this.closeForBrowser(aBrowser);
+  toggleForBrowser: function(aTarget) {
+    let browser = aTarget.ownerDocument.defaultView.gBrowser.selectedBrowser;
+    if (this.isOpenForBrowser(browser)) {
+      this.closeForBrowser(browser);
     } else {
-      this.openForBrowser(aBrowser);
+      this.openForBrowser(browser);
     }
   },
   openForBrowser: function(aBrowser) {
@@ -140,11 +189,11 @@ let JSTermManager = {
   updateCheckboxStatus: function(aWindow) {
     let selectedBrowser = aWindow.gBrowser.selectedBrowser;
     let checked = this.isOpenForBrowser(selectedBrowser);
-    let button = aWindow.document.querySelector("#developer-toolbar-jsterm");
+    let broadcaster = aWindow.document.querySelector("#devtoolsMenuBroadcaster_JSTerm");
     if (checked)
-      button.setAttribute("checked", "true");
+      broadcaster.setAttribute("checked", "true");
     else
-      button.setAttribute("checked", "false");
+      broadcaster.setAttribute("checked", "false");
   },
 }
 

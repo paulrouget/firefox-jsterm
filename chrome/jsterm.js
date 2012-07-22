@@ -5,7 +5,6 @@ Cu.import("resource:///modules/WebConsoleUtils.jsm");
 
 /**
  * Todo
- * . Use a broadcaster (and key binding)
  * . print() is slow
  * . undock
  * . save history and share it
