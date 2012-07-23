@@ -1,2 +1,3 @@
 content jsterm chrome/
 locale  jsterm en-US locale/en-US/
+resource jsterm modules/

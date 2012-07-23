@@ -5,15 +5,15 @@ Cu.import("resource:///modules/WebConsoleUtils.jsm");
 
 /**
  * Todo
- * . ctrl-w & keybinding doesn't work in window mode
- * . using the close button doesn't uncheck the button
  * . keybindings for linux & windows
  * . print() is slow
- * . undock
  * . save history and share it
+ * . Use jsm's
  * . make width/height persistent
  * . delete listeners & map
  * . underline the current autocompletion item
+ * . :connectToCurrentTab
+ * . :connect (remote protocole)
  */
 
 const JSTERM_MARK = "orion.annotation.jstermobject";
@@ -69,7 +69,7 @@ let JSTermUI = {
     this.input.focus();
   },
 
-  init: function(aManager, aBrowser, aContent, aChrome, aDefaultContent) {
+  init: function(aManager, aGlobalHistory, aBrowser, aContent, aChrome, aDefaultContent) {
     this.manager = aManager;
     this.browser = aBrowser;
     this.content = aContent;
@@ -87,12 +87,12 @@ let JSTermUI = {
     if (aDefaultContent) {
       defaultInputText = aDefaultContent.input;
       defaultOutputText = aDefaultContent.output;
-      this.history.init(aDefaultContent.history);
     } else {
       defaultInputText = "";
       defaultOutputText = "// type ':help' for help\n// Report bug here: https://github.com/paulrouget/firefox-jsterm";
-      this.history.init();
     }
+
+    this.history = new JSTermLocalHistory(aGlobalHistory);
 
     let outputContainer = document.querySelector("#output-container");
     this.inputContainer = document.querySelector("#input-container");
@@ -159,7 +159,6 @@ let JSTermUI = {
     this.ensureInputIsAlwaysVisible(this.input);
     this.input.editorElement.addEventListener("keydown", this.handleKeys, true);
 
-
     this.input.addEventListener(SourceEditor.EVENTS.TEXT_CHANGED, function() {
       this.multiline = this.isMultiline(this.input.getText());
     }.bind(this));
@@ -188,78 +187,6 @@ let JSTermUI = {
     e.editorElement.style.height = (height) + "px";
   },
 
-  history: {
-    _entries: [],
-    cursor: 0,
-    browsing: false,
-    init: function(entries) {
-      JSTermUI.input.addEventListener(SourceEditor.EVENTS.SELECTION, function() {
-        this.browsing = false;
-      }.bind(this));
-      if (entries) {
-        this._entries = entries;
-      }
-    },
-    copy: function() {
-      return this._entries.concat();
-    },
-    add: function(entry) {
-      if (!entry) return;
-      if (this._entries.length) {
-        let lastEntry = this._entries[this._entries.length - 1];
-        if (lastEntry == entry)
-          return;
-      }
-      this._entries.push(entry);
-    },
-
-    startBrowsing: function(originalText) {
-      this.originalText = originalText;
-      this.browsing = true;
-      this.cursor = this._entries.length;
-    },
-    goBack: function() {
-      if (this.canGoBack()) {
-        this.cursor--;
-        let entry = this.getEntryAtIndex(this.cursor);
-        JSTermUI.input.setText(entry);
-        JSTermUI.input.setCaretPosition(JSTermUI.input.getLineCount(), 1000);
-        if (JSTermUI.isMultiline(entry)) {
-          JSTermUI.multiline = true;
-        } else {
-          JSTermUI.multiline = false;
-        }
-        this.browsing = true;
-      }
-    },
-    goForward: function() {
-      if (this.canGoForward()) {
-        this.cursor++;
-        let entry = this.getEntryAtIndex(this.cursor);
-        JSTermUI.input.setText(entry);
-        JSTermUI.input.setCaretPosition(JSTermUI.input.getLineCount(), 1000);
-        if (JSTermUI.isMultiline(entry)) {
-          JSTermUI.multiline = true;
-        } else {
-          JSTermUI.multiline = false;
-        }
-        this.browsing = true;
-      }
-    },
-    canGoBack: function() {
-      return this.browsing && (this.cursor > 0);
-    },
-    canGoForward: function() {
-      return this.browsing && (this.cursor < this._entries.length);
-    },
-    getEntryAtIndex: function(idx) {
-      if (idx == this._entries.length) {
-        return this.originalText;
-      }
-      return this._entries[idx];
-    },
-  },
-
   ensureInputIsAlwaysVisible: function(editor) {
     editor.addEventListener(SourceEditor.EVENTS.TEXT_CHANGED, function() {
       this.container.scrollTop = this.container.scrollTopMax;
@@ -267,7 +194,9 @@ let JSTermUI = {
   },
 
   newEntry: function(code) {
+    this.history.stopBrowsing();
     this.history.add(code);
+
     this.input.setText("");
     this.multiline = false;
     this.printedSomething = false;
@@ -397,6 +326,10 @@ let JSTermUI = {
   handleKeys: function(e) {
     let code = this.input.getText();
 
+    if (e.keyCode != 38 && e.keyCode != 40) {
+      this.history.stopBrowsing();
+    }
+
     if (e.keyCode == 13 && e.shiftKey) {
       if (this.multiline) {
         e.stopPropagation();
@@ -429,21 +362,27 @@ let JSTermUI = {
     }
 
     if (e.keyCode == 38) {
-      if (!this.history.browsing && this.multiline) {
+      if (!this.history.isBrowsing() && this.multiline) {
         return;
       }
       e.stopPropagation();
       e.preventDefault();
-      if (!this.history.browsing) {
+      if (!this.history.isBrowsing() ) {
         this.history.startBrowsing(this.input.getText());
       }
-      this.history.goBack();
+      let entry = this.history.goBack();
+      if (entry) {
+        JSTermUI.input.setText(entry);
+        JSTermUI.input.setCaretPosition(JSTermUI.input.getLineCount(), 1000);
+      }
     }
     if (e.keyCode == 40) {
-      if (this.history.browsing) {
+      if (this.history.isBrowsing()) {
         e.stopPropagation();
         e.preventDefault();
-        this.history.goForward();
+        let entry = this.history.goForward();
+        JSTermUI.input.setText(entry);
+        JSTermUI.input.setCaretPosition(JSTermUI.input.getLineCount(), 1000);
       }
     }
   },
@@ -501,7 +440,6 @@ let JSTermUI = {
     return {
       input: this.input.getText(),
       output: this.output.getText(),
-      history: this.history.copy(),
     };
   },
 
@@ -999,3 +937,51 @@ PropertyTreeView2.prototype = {
     this._treeBox.rowCountChanged(0, this._rows.length);
   },
 };
+
+/** HISTORY **/
+
+function JSTermLocalHistory(aGlobalHistory) {
+  this.global = aGlobalHistory;
+}
+JSTermLocalHistory.prototype = {
+  _browsing: false,
+  isBrowsing: function() {
+    return this._browsing;
+  },
+  startBrowsing: function(aInitialValue) {
+    this._browsing = true;
+    this.cursor = this.global.getCursor(aInitialValue);
+  },
+  stopBrowsing: function() {
+    if (this.isBrowsing()) {
+      this._browsing = false;
+      this.global.releaseCursor(this.cursor);
+      this.cursor = null;
+    }
+  },
+  add: function(entry) {
+      this.global.add(entry);
+  },
+  canGoBack: function() {
+    return this.isBrowsing() && this.global.canGoBack(this.cursor);
+  },
+  canGoForward: function() {
+    return this.isBrowsing() && this.global.canGoForward(this.cursor);
+  },
+  goBack: function() {
+    if (this.canGoBack()) {
+      this.global.goBack(this.cursor);
+      let entry = this.global.getEntryForCursor(this.cursor);
+      return entry;
+    }
+    return null;
+  },
+  goForward: function() {
+    if (this.canGoForward()) {
+      this.global.goForward(this.cursor);
+      let entry = this.global.getEntryForCursor(this.cursor);
+      return entry;
+    }
+    return null;
+  },
+}

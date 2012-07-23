@@ -3,6 +3,7 @@ const Cc = Components.classes;
 const Ci = Components.interfaces;
 
 Cu.import("resource://gre/modules/Services.jsm");
+//Cu.import("resource://jsterm/modules/JSTermManager.jsm");
 
 let trackedWindows;
 let wObserver;
@@ -71,7 +72,7 @@ function shutdown() {
 function install() {}
 function uninstall() {}
 
-/* ----------- */
+/* ***** resource **** */
 
 let JSTermManager = {
   _map: new WeakMap(),
@@ -254,6 +255,7 @@ JSTerm.prototype = {
 
     termWindow.onload = function() {
       termWindow.JSTermUI.init(JSTermManager,
+                               JSTermGlobalHistory,
                                this.browser,
                                this.browser.contentWindow,
                                this.chromeWin,
@@ -289,3 +291,88 @@ JSTerm.prototype = {
     this.chromeWin = null;
   }
 }
+
+
+let JSTermGlobalHistory = {
+  _limit: 5,
+  _entries: [],
+
+  _cut: function() {
+    let newStart = this._entries.length - this._limit;
+    if (newStart <= 0) return;
+
+    this._entries = this._entries.slice(newStart);
+
+    for (let cursor of this._cursors) {
+      if (cursor) {
+        cursor.idx -= newStart;
+        cursor.origin -= newStart;
+      }
+    }
+  },
+  add: function(aEntry) {
+    if (!aEntry) {
+      return;
+    }
+    if (this._entries.length) {
+      let lastEntry = this._entries[this._entries.length - 1];
+      if (lastEntry == aEntry)
+        return;
+    }
+    this._entries.push(aEntry);
+
+    if (this._entries.length > this._limit) {
+      this._cut();
+    }
+  },
+  initFromPref: function() {
+  },
+  saveToPref: function() {
+  },
+
+
+  _cursors: [],
+  getCursor: function(aInitialValue) {
+    let cursor = {idx: this._entries.length,
+                  origin: this._entries.length,
+                  initialEntry: aInitialValue};
+    this._cursors.push(cursor);
+    return cursor;
+  },
+  releaseCursor: function(cursor) {
+      this._cursors[cursor.idx] = null;
+  },
+  getEntryForCursor: function(cursor) {
+    if (cursor.idx < 0) {
+      return "";
+    } else if (cursor.idx < cursor.origin) {
+      return this._entries[cursor.idx];
+    } else {
+      return cursor.initialEntry;
+    }
+  },
+  canGoBack: function(cursor) {
+    return (cursor.idx > 0)
+  },
+  canGoForward: function(cursor) {
+    return (cursor.idx < cursor.origin);
+  },
+  goBack: function(cursor) {
+    if (this.canGoBack(cursor)) {
+      cursor.idx--;
+      return true;
+    } else {
+      return false;
+    }
+  },
+  goForward: function(cursor) {
+    if (this.canGoForward(cursor)) {
+      cursor.idx++;
+      return true;
+    } else {
+      return false;
+    }
+  },
+}
+
+
