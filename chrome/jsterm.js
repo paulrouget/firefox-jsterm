@@ -6,7 +6,6 @@ Cu.import("resource:///modules/WebConsoleUtils.jsm");
 /**
  * Todo
  * . keybindings for linux & windows
- * . print() is slow
  * . Use jsm's
  * . make width/height persistent
  * . delete listeners & map
@@ -17,11 +16,14 @@ Cu.import("resource:///modules/WebConsoleUtils.jsm");
  */
 
 const JSTERM_MARK = "orion.annotation.jstermobject";
+const PRINT_TIMEOUT = 17;   // Every 17 ms → 60fps.
 
 let JSTermUI = {
   input: new SourceEditor(),
   output: new SourceEditor(),
   objects: new Map(),
+  printQueue: "",
+  printTimeout: null,
 
   close: function() {
     if (this.closing) return;
@@ -114,7 +116,7 @@ let JSTermUI = {
   switchToChromeMode: function() {
     let label = document.querySelector("#completion-candidates > label");
     this.sb = this.buildSandbox(this.chrome);
-    this.output.setText(" // Switched to chrome mode.", this.output.getCharCount());
+    this.print("// Switched to chrome mode.");
     if (this.completion) this.completion.destroy();
     this.completion = new JSCompletion(this.input, label, this.sb);
     this.inputContainer.classList.add("chrome");
@@ -128,7 +130,7 @@ let JSTermUI = {
     if (this.completion) this.completion.destroy();
     this.completion = new JSCompletion(this.input, label, this.sb);
     if (needMessage) {
-      this.output.setText(" // Switched to content mode.", this.output.getCharCount());
+      this.print("// Switched to content mode.");
     }
     this.inputContainer.classList.remove("chrome");
     window.document.title = "JSTerm: " + this.content.location;
@@ -137,11 +139,18 @@ let JSTermUI = {
   buildSandbox: function(win) {
     let sb = Cu.Sandbox(win, {sandboxPrototype: win, wantXrays: false});
     this.target = win;
-    sb.print = function(msg) {
-      this.printedSomething = true;
-      this.output.setText("\n" + msg, this.output.getCharCount());
-    }.bind(this);
+    sb.print = this.print.bind(this);
     return sb;
+  },
+
+  print: function(msg = "", startWith = "\n") {
+    clearTimeout(this.printTimeout);
+    this.printQueue += startWith + msg;
+    this.printTimeout = setTimeout(function printCommit() {
+      this.printedSomething = true;
+      this.output.setText(this.printQueue, this.output.getCharCount());
+      this.printQueue = "";
+    }.bind(this), PRINT_TIMEOUT);
   },
 
   initOutput: function() {
@@ -202,11 +211,11 @@ let JSTermUI = {
     this.printedSomething = false;
 
     if (code == "") {
-      this.output.setText("\n", this.output.getCharCount());
+      this.print();
       return;
     }
 
-    this.output.setText("\n" + code, this.output.getCharCount());
+    this.print(code);
 
     for (let cmd of this.commands) {
       if (cmd.name == code) {
@@ -237,9 +246,9 @@ let JSTermUI = {
     if (error) {
       error = error.toString();
       if (this.isMultiline(error) || this.isMultiline(code) || this.printedSomething) {
-        this.output.setText("\n/* error:\n" + error + "\n*/", this.output.getCharCount());
+        this.print("/* error:\n" + error + "\n*/");
       } else {
-        this.output.setText(" // error: " + error, this.output.getCharCount());
+        this.print(" // error: " + error, startWith = "");
       }
       return;
     }
@@ -283,7 +292,7 @@ let JSTermUI = {
       }
     }
 
-    this.output.setText(resultStr, this.output.getCharCount());
+    this.print(resultStr, startWith = "");
 
     if (isAnObject) {
       let line = this.output.getLineCount() - 1;
@@ -303,7 +312,7 @@ let JSTermUI = {
   },
 
   help: function() {
-    let text = "\n/**";
+    let text = "/**";
     text += "\n * 'Return' to evaluate entry,";
     text += "\n * 'Tab' for autocompletion,";
     text += "\n * 'Ctrl-l' clear screen,";
@@ -320,7 +329,7 @@ let JSTermUI = {
       text += "\n *   " + cmd.name + " - " + cmd.help;
     }
     text += "\n */";
-    this.output.setText(text, this.output.getCharCount());
+    this.print(text);
   },
 
   handleKeys: function(e) {
@@ -418,6 +427,8 @@ let JSTermUI = {
     this.input = null;
     this.output = null;
     this.objects = null;
+    this.printQueue = null;
+    this.printTimeout = null;
   },
 
   inspect: function(obj, filter) {
