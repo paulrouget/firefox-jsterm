@@ -181,6 +181,7 @@ let JSTermManager = {
     this.updateCheckboxStatus(aBrowser.ownerDocument.defaultView);
   },
   closeForBrowser: function(aBrowser) {
+    JSTermGlobalHistory.saveToPref();
     let term = this._map.get(aBrowser);
     if (!term)
       return;
@@ -310,6 +311,7 @@ let JSTermGlobalHistory = {
       }
     }
   },
+
   add: function(aEntry) {
     if (!aEntry) {
       return;
@@ -325,11 +327,31 @@ let JSTermGlobalHistory = {
       this._cut();
     }
   },
+
   initFromPref: function() {
-  },
-  saveToPref: function() {
+    let history = [];
+
+    // Try to load history from pref
+    if (Services.prefs.prefHasUserValue("devtools.jsterm.history")) {
+      try {
+        history = JSON.parse(Services.prefs.getCharPref("devtools.jsterm.history"));
+      } catch(e) {
+        // User pref is malformated.
+        Cu.reportError("Could not parse pref `devtools.jsterm.history`: " + e);
+      }
+    }
+
+    if (Array.isArray(history)) {
+      this._entries = history;
+    } else {
+      Cu.reportError("History (devtools.jsterm.history) is malformated.");
+      this._entries = [];
+    }
   },
 
+  saveToPref: function() {
+    Services.prefs.setCharPref("devtools.jsterm.history", JSON.stringify(this._entries));
+  },
 
   _cursors: [],
   getCursor: function(aInitialValue) {
@@ -339,9 +361,11 @@ let JSTermGlobalHistory = {
     this._cursors.push(cursor);
     return cursor;
   },
+
   releaseCursor: function(cursor) {
       this._cursors[cursor.idx] = null;
   },
+
   getEntryForCursor: function(cursor) {
     if (cursor.idx < 0) {
       return "";
@@ -351,12 +375,15 @@ let JSTermGlobalHistory = {
       return cursor.initialEntry;
     }
   },
+
   canGoBack: function(cursor) {
     return (cursor.idx > 0)
   },
+
   canGoForward: function(cursor) {
     return (cursor.idx < cursor.origin);
   },
+
   goBack: function(cursor) {
     if (this.canGoBack(cursor)) {
       cursor.idx--;
@@ -365,6 +392,7 @@ let JSTermGlobalHistory = {
       return false;
     }
   },
+
   goForward: function(cursor) {
     if (this.canGoForward(cursor)) {
       cursor.idx++;
@@ -374,5 +402,4 @@ let JSTermGlobalHistory = {
     }
   },
 }
-
-
+JSTermGlobalHistory.initFromPref();

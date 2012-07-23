@@ -7,13 +7,13 @@ Cu.import("resource:///modules/WebConsoleUtils.jsm");
  * Todo
  * . keybindings for linux & windows
  * . print() is slow
- * . save history and share it
  * . Use jsm's
  * . make width/height persistent
  * . delete listeners & map
  * . underline the current autocompletion item
  * . :connectToCurrentTab
  * . :connect (remote protocole)
+ * . ctrl-r
  */
 
 const JSTERM_MARK = "orion.annotation.jstermobject";
@@ -415,6 +415,9 @@ let JSTermUI = {
     this.completion.destroy();
     this.completion = null;
     this.treeview = null;
+    this.input = null;
+    this.output = null;
+    this.objects = null;
   },
 
   inspect: function(obj, filter) {
