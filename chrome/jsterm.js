@@ -16,7 +16,6 @@ Cu.import("resource:///modules/WebConsoleUtils.jsm");
  */
 
 const JSTERM_MARK = "orion.annotation.jstermobject";
-const PRINT_TIMEOUT = 17;   // Every 17 ms → 60fps.
 
 let JSTermUI = {
   input: new SourceEditor(),
@@ -150,7 +149,7 @@ let JSTermUI = {
       this.printedSomething = true;
       this.output.setText(this.printQueue, this.output.getCharCount());
       this.printQueue = "";
-    }.bind(this), PRINT_TIMEOUT);
+    }.bind(this), 0);
   },
 
   initOutput: function() {
@@ -191,9 +190,15 @@ let JSTermUI = {
   },
 
   setEditorSize: function(e, height) {
+    let winHeight = e.editorElement.ownerDocument.defaultView.innerHeight;
+    // We want to resize if the editor doesn't overflow on the Y axis.
     e.editorElement.style.minHeight =
     e.editorElement.style.maxHeight =
-    e.editorElement.style.height = (height) + "px";
+    e.editorElement.style.height =
+      (e._view.getLineHeight() * e.getLineCount() +
+      this.input.editorElement.scrollHeight <= winHeight
+        ? (height) + "px"
+        : "");
   },
 
   ensureInputIsAlwaysVisible: function(editor) {
