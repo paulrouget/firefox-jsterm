@@ -15,7 +15,15 @@ Cu.import("resource:///modules/WebConsoleUtils.jsm");
  * . ctrl-r
  */
 
-const JSTERM_MARK = "orion.annotation.jstermobject";
+let JSTERM_MARK = "orion.annotation.jstermobject";
+
+let keys = {
+  enter: 13,
+  up: 38,
+  down: 40,
+  d: 68,
+  l: 76
+};
 
 let JSTermUI = {
   input: new SourceEditor(),
@@ -340,11 +348,11 @@ let JSTermUI = {
   handleKeys: function(e) {
     let code = this.input.getText();
 
-    if (e.keyCode != 38 && e.keyCode != 40) {
+    if (e.keyCode != keys.up && e.keyCode != 40) {
       this.history.stopBrowsing();
     }
 
-    if (e.keyCode == 13 && e.shiftKey) {
+    if (e.keyCode == keys.enter && e.shiftKey) {
       if (this.multiline) {
         e.stopPropagation();
         e.preventDefault();
@@ -354,7 +362,7 @@ let JSTermUI = {
       }
     }
 
-    if (e.keyCode == 13 && !e.shiftKey) {
+    if (e.keyCode == keys.enter && !e.shiftKey) {
       if (this.multiline) {
         // Do nothing.
       } else {
@@ -364,18 +372,19 @@ let JSTermUI = {
       }
     }
 
-    if (e.keyCode == 68 && e.ctrlKey) {
+    if (e.keyCode == keys.d && e.ctrlKey) {
       e.stopPropagation();
       e.preventDefault();
       this.close();
     }
-    if (e.keyCode == 76 && e.ctrlKey) {
+
+    if (e.keyCode == keys.d && e.ctrlKey) {
       e.stopPropagation();
       e.preventDefault();
       this.clear();
     }
 
-    if (e.keyCode == 38) {
+    if (e.keyCode == keys.up) {
       if (!this.history.isBrowsing() && this.multiline) {
         return;
       }
@@ -390,7 +399,8 @@ let JSTermUI = {
         JSTermUI.input.setCaretPosition(JSTermUI.input.getLineCount(), 1000);
       }
     }
-    if (e.keyCode == 40) {
+
+    if (e.keyCode == keys.down) {
       if (this.history.isBrowsing()) {
         e.stopPropagation();
         e.preventDefault();
@@ -422,7 +432,6 @@ let JSTermUI = {
     }
     this.output._annotationModel.addAnnotation(annotation);
   },
-
 
   destroy: function() {
     this.input.editorElement.removeEventListener("keydown", this.handleKeys, true);
@@ -482,19 +491,15 @@ let JSTermUI = {
 function JSCompletion(editor, candidatesWidget, sandbox) {
   this.editor = editor;
   this.candidatesWidget = candidatesWidget;
-
   this.handleKeys = this.handleKeys.bind(this);
-
   this.editor.editorElement.addEventListener("keydown", this.handleKeys, true);
-
   this.buildDictionnary();
-
   this.sb = sandbox;
 }
 
 JSCompletion.prototype = {
   buildDictionnary: function() {
-    let JSKeywords = "break delete case do catch else class export continue finally const for debugger function default if import this in throw instanceof try let typeof new var return void super while switch with";
+    let JSKeywords = "break delete case do catch else class export continue finally let for debugger function default if import this in throw instanceof try let typeof new var return void super while switch with";
     this.dictionnary = JSKeywords.split(" ");
     for (let cmd of JSTermUI.commands) {
       this.dictionnary.push(cmd.name);
@@ -599,10 +604,11 @@ JSCompletion.prototype = {
     this.candidatesWidget.setAttribute("value", this.candidates.matches.join(" "));
     this.isCompleting = true;
 
-    if (this.candidates.matches[0] == this.candidates.matchProp)
+    if (this.candidates.matches[0] == this.candidates.matchProp) {
       this.candidatesIndex = 0;
-    else
+    } else {
       this.candidatesIndex = -1;
+    }
   },
 
   continueCompleting: function() {
@@ -745,8 +751,7 @@ PropertyTreeView2.prototype = {
    * @param number aLevel
    *        The level you want to give to each property in the remote object.
    */
-  _updateRemoteObject: function PTV__updateRemoteObject(aObject, aLevel)
-  {
+  _updateRemoteObject: function PTV__updateRemoteObject(aObject, aLevel) {
     aObject.forEach(function(aElement) {
       aElement.level = aLevel;
       aElement.isOpened = false;
@@ -761,8 +766,7 @@ PropertyTreeView2.prototype = {
    * @param object aObject
    *        The object you want to inspect.
    */
-  _inspectObject: function PTV__inspectObject(aObject, filter)
-  {
+  _inspectObject: function PTV__inspectObject(aObject, filter) {
     this._objectCache = {};
     this._remoteObjectProvider = this._localObjectProvider.bind(this);
     let children = WebConsoleUtils.namesAndValuesOf(aObject, this._objectCache);
@@ -785,16 +789,17 @@ PropertyTreeView2.prototype = {
    * @param function aCallback
    *        The function you want to receive the object.
    */
-  _localObjectProvider:
-  function PTV__localObjectProvider(aFromCacheId, aObjectId, aDestCacheId,
-                                    aCallback)
-  {
-    let object = WebConsoleUtils.namesAndValuesOf(this._objectCache[aObjectId],
-                                                  this._objectCache);
-    aCallback({cacheId: aFromCacheId,
-               objectId: aObjectId,
-               object: object,
-               childrenCacheId: aDestCacheId || aFromCacheId,
+  _localObjectProvider: function PTV__localObjectProvider(aFromCacheId,
+    aObjectId, aDestCacheId, aCallback) {
+    let object = WebConsoleUtils.namesAndValuesOf(
+      this._objectCache[aObjectId], this._objectCache
+    );
+
+    aCallback({
+      cacheId: aFromCacheId,
+      objectId: aObjectId,
+      object: object,
+      childrenCacheId: aDestCacheId || aFromCacheId,
     });
   },
 
@@ -802,8 +807,14 @@ PropertyTreeView2.prototype = {
 
   selection: null,
 
-  get rowCount()                     { return this._rows.length; },
-  setTree: function(treeBox)         { this._treeBox = treeBox;  },
+  get rowCount() {
+    return this._rows.length;
+  },
+
+  setTree: function(treeBox) {
+    this._treeBox = treeBox;
+  },
+
   getCellText: function(idx, column) {
     let row = this._rows[idx];
     if (column.id == "propName") {
@@ -812,23 +823,40 @@ PropertyTreeView2.prototype = {
       return row.value;
     }
   },
+
   getLevel: function(idx) {
     return this._rows[idx].level;
   },
+
   isContainer: function(idx) {
     return !!this._rows[idx].inspectable;
   },
+
   isContainerOpen: function(idx) {
     return this._rows[idx].isOpened;
   },
-  isContainerEmpty: function(idx)    { return false; },
-  isSeparator: function(idx)         { return false; },
-  isSorted: function()               { return false; },
-  isEditable: function(idx, column)  { return false; },
-  isSelectable: function(row, col)   { return true; },
 
-  getParentIndex: function(idx)
-  {
+  isContainerEmpty: function(idx) {
+    return false; 
+  },
+
+  isSeparator: function(idx) {
+    return false;
+  },
+
+  isSorted: function() {
+    return false;
+  },
+
+  isEditable: function(idx, column) {
+    return false;
+  },
+
+  isSelectable: function(row, col) {
+    return true;
+  },
+
+  getParentIndex: function(idx) {
     if (this.getLevel(idx) == 0) {
       return -1;
     }
@@ -840,14 +868,12 @@ PropertyTreeView2.prototype = {
     return -1;
   },
 
-  hasNextSibling: function(idx, after)
-  {
+  hasNextSibling: function(idx, after) {
     var thisLevel = this.getLevel(idx);
     return this._rows.slice(after + 1).some(function (r) r.level == thisLevel);
   },
 
-  toggleOpenState: function(idx)
-  {
+  toggleOpenState: function(idx) {
     let item = this._rows[idx];
     if (!item.inspectable) {
       return;
@@ -869,8 +895,7 @@ PropertyTreeView2.prototype = {
       }
       this._treeBox.invalidateRow(idx);
       this._treeBox.endUpdateBatch();
-    }
-    else {
+    } else {
       let levelUpdate = true;
       let callback = function _onRemoteResponse(aResponse) {
         this._treeBox.beginUpdateBatch();
@@ -962,15 +987,19 @@ PropertyTreeView2.prototype = {
 function JSTermLocalHistory(aGlobalHistory) {
   this.global = aGlobalHistory;
 }
+
 JSTermLocalHistory.prototype = {
   _browsing: false,
+
   isBrowsing: function() {
     return this._browsing;
   },
+
   startBrowsing: function(aInitialValue) {
     this._browsing = true;
     this.cursor = this.global.getCursor(aInitialValue);
   },
+
   stopBrowsing: function() {
     if (this.isBrowsing()) {
       this._browsing = false;
@@ -978,15 +1007,19 @@ JSTermLocalHistory.prototype = {
       this.cursor = null;
     }
   },
+
   add: function(entry) {
-      this.global.add(entry);
+    this.global.add(entry);
   },
+
   canGoBack: function() {
     return this.isBrowsing() && this.global.canGoBack(this.cursor);
   },
+
   canGoForward: function() {
     return this.isBrowsing() && this.global.canGoForward(this.cursor);
   },
+
   goBack: function() {
     if (this.canGoBack()) {
       this.global.goBack(this.cursor);
@@ -995,6 +1028,7 @@ JSTermLocalHistory.prototype = {
     }
     return null;
   },
+
   goForward: function() {
     if (this.canGoForward()) {
       this.global.goForward(this.cursor);
