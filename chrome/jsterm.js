@@ -140,6 +140,15 @@ let JSTermUI = {
     let sb = Cu.Sandbox(win, {sandboxPrototype: win, wantXrays: false});
     this.target = win;
     sb.print = this.print.bind(this);
+
+    sb.$ = function(aSelector) {
+      return win.document.querySelector(aSelector);
+    };
+
+    sb.$$ = function(aSelector) {
+      return win.document.querySelectorAll(aSelector);
+    };
+
     return sb;
   },
 
