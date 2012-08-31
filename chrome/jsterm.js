@@ -303,8 +303,11 @@ let JSTermUI = {
     let isAString = (typeof result) == "string";
 
     let resultStr;
-    if (result == undefined) {
+    if (result === undefined) {
       resultStr = "undefined";
+    } else if(result === null) {
+      resultStr = "null";
+      isAnObject = false;
     } else if (isAString) {
       resultStr = "\"" + result + "\"";
     } else if (isAnArray) {
@@ -313,8 +316,7 @@ let JSTermUI = {
       resultStr = result.toString();
     }
 
-    if (code == resultStr ||
-        (result == undefined)) {
+    if (code == resultStr) {
       return;
     }
 
@@ -337,7 +339,6 @@ let JSTermUI = {
     }
 
     this.print(resultStr, startWith = "", isAnObject, isAnObject ? result : null);
-
   },
 
   isMultiline: function(text) {
