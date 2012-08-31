@@ -78,3 +78,10 @@ window {
   background-color: #26384E;
   color: white;
 }
+
+/* -- Light Theme -- */
+
+window.light {
+  background-color: #F3F3F3;
+  color: black;
+}

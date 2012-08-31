@@ -2,6 +2,7 @@ let Cu = Components.utils;
 let Ci = Components.interfaces;
 Cu.import("resource:///modules/source-editor.jsm");
 Cu.import("resource:///modules/WebConsoleUtils.jsm");
+Cu.import("resource://gre/modules/Services.jsm");
 
 /**
  * Todo
@@ -50,6 +51,8 @@ let JSTermUI = {
        exec: this.undock.bind(this)},
       {name: ":dock", help: "Move the terminal in browser",
        exec: this.dock.bind(this)},
+      {name: ":toggleLightTheme", help: "Toggle the light (white) theme",
+       exec: this.toggleLightTheme.bind(this)},
       {name: "ls", hidden: true, exec: this.ls.bind(this)},
     ];
   },
@@ -113,6 +116,12 @@ let JSTermUI = {
       mode: SourceEditor.MODES.JAVASCRIPT,
       theme: "chrome://jsterm/content/orion.css",
     }, this.initInput.bind(this));
+
+    try { // This might be too early. But still, we try.
+      if (Services.prefs.getBoolPref("devtools.jsterm.lightTheme")) {
+        this._setLightTheme();
+      }
+    } catch(e){}
 
   },
 
@@ -181,6 +190,12 @@ let JSTermUI = {
   },
 
   initOutput: function() {
+    try {
+      if (Services.prefs.getBoolPref("devtools.jsterm.lightTheme")) {
+        this._setLightTheme();
+      }
+    } catch(e){}
+
     this.makeEditorFitContent(this.output);
     this.ensureInputIsAlwaysVisible(this.output);
     this.output._annotationStyler.addAnnotationType(JSTERM_MARK);
@@ -189,6 +204,12 @@ let JSTermUI = {
   },
 
   initInput: function() {
+    try {
+      if (Services.prefs.getBoolPref("devtools.jsterm.lightTheme")) {
+        this._setLightTheme();
+      }
+    } catch(e){}
+
     this.switchToContentMode();
 
     this.makeEditorFitContent(this.input);
@@ -244,8 +265,6 @@ let JSTermUI = {
 
     this.input.setText("");
     this.multiline = false;
-
-    this.printCount = 0;
 
     if (code == "") {
       this.print();
@@ -517,6 +536,37 @@ let JSTermUI = {
 
   ls: function() {
     this.print("// Did you just type \"ls\"? You know this is not a unix shell, right?");
+  },
+
+  toggleLightTheme: function() {
+    let isLight = document.documentElement.classList.contains("light");
+
+    Services.prefs.setBoolPref("devtools.jsterm.lightTheme", !isLight);
+
+    if (isLight) {
+      this._setDarkTheme();
+    } else {
+      this._setLightTheme();
+    }
+  },
+
+  _setLightTheme: function() {
+    document.documentElement.classList.add("light");
+    let inputView = this.input.editorElement.contentDocument.querySelector("iframe")
+                                            .contentDocument.querySelector(".view");
+    inputView.classList.add("light");
+    let outputView = this.output.editorElement.contentDocument.querySelector("iframe")
+                                              .contentDocument.querySelector(".view");
+    outputView.classList.add("light");
+  },
+
+  _setDarkTheme: function() {
+    document.documentElement.classList.remove("light");
+    let inputView = this.input.editorElement.contentDocument.querySelector("iframe")
+                                            .contentDocument.querySelector(".view");
+    inputView.classList.remove("light");
+    let outputView = this.output.editorElement.contentDocument.querySelector("iframe")
+    outputView.classList.remove("light");
   },
 }
 

@@ -73,3 +73,15 @@
   color: red;
 }
 
+
+/* -- Light Theme -- */
+
+.view.light {
+  color: #000;
+}
+
+.view.light .annotationLine.object:hover > * {
+  color: #000!important;
+}
+
+
