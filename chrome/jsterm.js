@@ -7,10 +7,8 @@ Cu.import("resource:///modules/WebConsoleUtils.jsm");
  * Todo
  * . keybindings for linux & windows
  * . Use jsm's
- * . make width/height persistent
  * . delete listeners & map
  * . underline the current autocompletion item
- * . :connectToCurrentTab
  * . :connect (remote protocole)
  * . ctrl-r
  */

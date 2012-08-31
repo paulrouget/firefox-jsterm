@@ -1,6 +1,5 @@
 FILES = chrome/ \
 				locale/ \
-				modules/ \
 				bootstrap.js \
 				chrome.manifest \
 				install.rdf
