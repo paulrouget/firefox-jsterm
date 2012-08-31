@@ -11,6 +11,7 @@
         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
         title="JSTerm"
         windowtype="devtools:jsterm"
+        fullscreenbutton="true"
         macanimationtype="document"
         screenX="4" screenY="4"
         width="640" height="480"
