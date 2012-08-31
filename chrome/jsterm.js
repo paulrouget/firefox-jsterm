@@ -120,7 +120,7 @@ let JSTermUI = {
     if (this.completion) this.completion.destroy();
     this.completion = new JSCompletion(this.input, label, this.sb);
     this.inputContainer.classList.add("chrome");
-    window.document.title = "JSTerm: (chrome) " + this.chrome.location;
+    window.document.title = "JSTerm: (chrome) " + this.chrome.document.title;
   },
 
   switchToContentMode: function() {
@@ -133,7 +133,7 @@ let JSTermUI = {
       this.print("// Switched to content mode.");
     }
     this.inputContainer.classList.remove("chrome");
-    window.document.title = "JSTerm: " + this.content.location;
+    window.document.title = "JSTerm: " + this.content.document.title;
   },
 
   buildSandbox: function(win) {
