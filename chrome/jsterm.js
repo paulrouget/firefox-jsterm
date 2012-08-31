@@ -566,6 +566,7 @@ let JSTermUI = {
                                             .contentDocument.querySelector(".view");
     inputView.classList.remove("light");
     let outputView = this.output.editorElement.contentDocument.querySelector("iframe")
+                                            .contentDocument.querySelector(".view");
     outputView.classList.remove("light");
   },
 }
