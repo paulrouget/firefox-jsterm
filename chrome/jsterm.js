@@ -52,6 +52,7 @@ let JSTermUI = {
        exec: this.undock.bind(this)},
       {name: ":dock", help: "Move the terminal in browser",
        exec: this.dock.bind(this)},
+      {name: "ls", hidden: true, exec: this.ls.bind(this)},
     ];
   },
 
@@ -90,7 +91,7 @@ let JSTermUI = {
       defaultOutputText = aDefaultContent.output;
     } else {
       defaultInputText = "";
-      defaultOutputText = "// type ':help' for help\n// Report bug here: https://github.com/paulrouget/firefox-jsterm";
+      defaultOutputText = "// type ':help' for help\n// Report bug here: https://github.com/paulrouget/firefox-jsterm/issues";
     }
 
     this.history = new JSTermLocalHistory(aGlobalHistory);
@@ -142,14 +143,29 @@ let JSTermUI = {
     return sb;
   },
 
-  print: function(msg = "", startWith = "\n") {
+  print: function(msg = "", startWith = "\n", isAnObject = false, object = null) {
     clearTimeout(this.printTimeout);
-    this.printQueue += startWith + msg;
-    this.printTimeout = setTimeout(function printCommit() {
-      this.printedSomething = true;
-      this.output.setText(this.printQueue, this.output.getCharCount());
-      this.printQueue = "";
-    }.bind(this), 0);
+
+    if (isAnObject) {
+      // let's do that synchronously, because we want to add a mark
+      if (this.printQueue) {
+        // flush
+        this.output.setText(this.printQueue, this.output.getCharCount());
+        this.printQueue = "";
+      }
+      this.output.setText(startWith + msg, this.output.getCharCount());
+      let line = this.output.getLineCount() - 1;
+      this.objects.set(line, object);
+      this.markRange(line);
+
+    } else {
+      this.printQueue += startWith + msg;
+
+      this.printTimeout = setTimeout(function printCommit() {
+        this.output.setText(this.printQueue, this.output.getCharCount());
+        this.printQueue = "";
+      }.bind(this), 0);
+    }
   },
 
   initOutput: function() {
@@ -208,15 +224,20 @@ let JSTermUI = {
   },
 
   newEntry: function(code) {
+    if (this.evaluating) return;
+    this.evaluating = true;
+
     this.history.stopBrowsing();
     this.history.add(code);
 
     this.input.setText("");
     this.multiline = false;
-    this.printedSomething = false;
+
+    this.printCount = 0;
 
     if (code == "") {
       this.print();
+      this.onceEntryResultPrinted();
       return;
     }
 
@@ -225,6 +246,7 @@ let JSTermUI = {
     for (let cmd of this.commands) {
       if (cmd.name == code) {
         cmd.exec();
+        this.onceEntryResultPrinted();
         return;
       }
     }
@@ -237,7 +259,10 @@ let JSTermUI = {
     }
 
     this.dumpEntryResult(result, error, code);
+    this.onceEntryResultPrinted();
+  },
 
+  onceEntryResultPrinted: function() {
     /* Ugly hack to scrollback */
     this.output.editorElement.contentDocument.querySelector("iframe")
                              .contentDocument.querySelector(".view").scrollLeft = 0;
@@ -245,12 +270,14 @@ let JSTermUI = {
     /* Clear Selection if any */
     let cursor = this.output.getLineStart(this.output.getLineCount() - 1);
     this.output.setSelection(cursor, cursor);
+
+    this.evaluating = false;
   },
 
   dumpEntryResult: function(result, error, code) {
     if (error) {
       error = error.toString();
-      if (this.isMultiline(error) || this.isMultiline(code) || this.printedSomething) {
+      if (this.isMultiline(error) || this.isMultiline(code)) {
         this.print("/* error:\n" + error + "\n*/");
       } else {
         this.print(" // error: " + error, startWith = "");
@@ -275,7 +302,7 @@ let JSTermUI = {
     }
 
     if (code == resultStr ||
-        (result == undefined && this.printedSomething)) {
+        (result == undefined)) {
       return;
     }
 
@@ -290,20 +317,15 @@ let JSTermUI = {
         resultStr = "\n" + resultStr;
       }
     } else {
-      if (this.isMultiline(code) || this.printedSomething) {
+      if (this.isMultiline(code)) {
         resultStr = "\n// " + resultStr;
       } else {
         resultStr = " // " + resultStr;
       }
     }
 
-    this.print(resultStr, startWith = "");
+    this.print(resultStr, startWith = "", isAnObject, isAnObject ? result : null);
 
-    if (isAnObject) {
-      let line = this.output.getLineCount() - 1;
-      this.objects.set(line, result);
-      this.markRange(line);
-    }
   },
 
   isMultiline: function(text) {
@@ -331,8 +353,12 @@ let JSTermUI = {
     text += "\n * ";
     text += "\n * Commands:";
     for (let cmd of this.commands) {
-      text += "\n *   " + cmd.name + " - " + cmd.help;
+      if (cmd.help) {
+        text += "\n *   " + cmd.name + " - " + cmd.help;
+      }
     }
+    text += "\n * ";
+    text += "\n * Bugs? Suggestions? Questions? -> https://github.com/paulrouget/firefox-jsterm/issues";
     text += "\n */";
     this.print(text);
   },
@@ -473,6 +499,10 @@ let JSTermUI = {
       this.manager.moveTermTo(this.browser, "in_browser");
     }
   },
+
+  ls: function() {
+    this.print("// Did you just type \"ls\"? You know this is not a unix shell, right?");
+  },
 }
 
 
@@ -497,7 +527,9 @@ JSCompletion.prototype = {
     let JSKeywords = "break delete case do catch else class export continue finally const for debugger function default if import this in throw instanceof try let typeof new var return void super while switch with";
     this.dictionnary = JSKeywords.split(" ");
     for (let cmd of JSTermUI.commands) {
-      this.dictionnary.push(cmd.name);
+      if (!cmd.hidden) {
+        this.dictionnary.push(cmd.name);
+      }
     }
   },
   handleKeys: function(e) {

@@ -295,7 +295,7 @@ JSTerm.prototype = {
 
 
 let JSTermGlobalHistory = {
-  _limit: 5,
+  _limit: 100, // Should be a pref
   _entries: [],
 
   _cut: function() {

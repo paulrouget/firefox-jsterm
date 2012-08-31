@@ -7,4 +7,4 @@ FILES = chrome/ \
 
 all:
 	rm -f jsterm.xpi && zip -r jsterm.xpi $(FILES)
-	wget --post-file=$(PWD)/jsterm.xpi http://localhost:8888/
+	wget --post-file=$(PWD)/jsterm.xpi http://localhost:8889/
