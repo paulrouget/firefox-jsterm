@@ -77,6 +77,11 @@ let JSTermUI = {
     this.content = aContent;
     this.chrome = aChrome;
 
+    this.version = "meeh";
+    this.chrome.AddonManager.getAddonByID("jsterm@paulrouget.com", function(addon) {
+      this.version = addon.version;
+    }.bind(this));
+
     this.registerCommands();
 
     this.handleKeys = this.handleKeys.bind(this);
@@ -349,6 +354,8 @@ let JSTermUI = {
 
   help: function() {
     let text = "/**";
+    text += "\n * JSTerm (version " + this.version + ")";
+    text += "\n * ";
     text += "\n * 'Return' to evaluate entry,";
     text += "\n * 'Tab' for autocompletion,";
     text += "\n * 'Ctrl-l' clear screen,";
