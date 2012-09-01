@@ -213,21 +213,22 @@ let JSTermUI = {
     } catch(ex) {}
   },
 
-  print: function(msg = "", startWith = "\n", isAnObject = false, object = null) {
+  print: function(msg = "", startWith = "\n", isAnObject = false, isAFunction = false, object = null) {
     clearTimeout(this.printTimeout);
 
-    if (isAnObject) {
+    if (isAnObject || isAFunction) {
       // let's do that synchronously, because we want to add a mark
       if (this.printQueue) {
         // flush
         this.output.setText(this.printQueue, this.output.getCharCount());
         this.printQueue = "";
       }
-      this.output.setText(startWith + msg, this.output.getCharCount());
+      let out = startWith + msg;
+      this.output.setText(out, this.output.getCharCount());
       let line = this.output.getLineCount() - 1;
-      this.objects.set(line, object);
-      this.markRange(line);
-
+      if (isAnObject)
+        this.objects.set(line, object);
+      this.markRange(line, isAnObject, out.split('\n').length - 1);
     } else {
       this.printQueue += startWith + msg;
 
@@ -381,6 +382,7 @@ let JSTermUI = {
     let maxLength = 80;
     let type = ({}).toString.call(result).slice(8, -1);
     let isAnObject = typeof result == "object";
+    let isAFunction = typeof result == "function";
     let elementClass = /^HTML\w+Element$/;
 
     let resultStr;
@@ -438,7 +440,7 @@ let JSTermUI = {
       }
     }
 
-    this.print(resultStr, startWith = "", isAnObject, isAnObject ? result : null);
+    this.print(resultStr, startWith = "", isAnObject, isAFunction, isAnObject ? result : null);
   },
 
   isMultiline: function(text) {
@@ -553,13 +555,13 @@ let JSTermUI = {
     }
   },
 
-  markRange: function(line) {
+  markRange: function(line, isAnObject = true, lineCount = 1) {
     let annotation = {
       type: JSTERM_MARK,
-      start: this.output.getLineStart(line),
+      start: this.output.getLineStart(line - lineCount + 1),
       end: this.output.getLineEnd(line),
       title: "Object",
-      lineStyle: {styleClass: "annotationLine object"},
+      lineStyle: {styleClass: "annotationLine " + (isAnObject ? "object" : "function")},
     }
     this.output._annotationModel.addAnnotation(annotation);
   },
