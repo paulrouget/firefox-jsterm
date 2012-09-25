@@ -258,7 +258,6 @@ JSTerm.prototype = {
       termWindow.JSTermUI.init(JSTermManager,
                                JSTermGlobalHistory,
                                this.browser,
-                               this.browser.contentWindow,
                                this.chromeWin,
                                this.savedContent);
     }.bind(this);

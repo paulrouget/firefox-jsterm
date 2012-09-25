@@ -4,6 +4,7 @@ window {
   color: white;
   font-family: Monaco, monospace;
   font-size: 12px;
+
 }
 
 #object-inspector > tree {

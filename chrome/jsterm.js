@@ -12,6 +12,7 @@ Cu.import("resource://gre/modules/Services.jsm");
  * . underline the current autocompletion item
  * . :connect (remote protocole)
  * . ctrl-r
+ * . what to do if page reload?
  */
 
 const JSTERM_MARK = "orion.annotation.jstermobject";
@@ -72,10 +73,9 @@ let JSTermUI = {
     this.input.focus();
   },
 
-  init: function(aManager, aGlobalHistory, aBrowser, aContent, aChrome, aDefaultContent) {
+  init: function(aManager, aGlobalHistory, aBrowser, aChrome, aDefaultContent) {
     this.manager = aManager;
     this.browser = aBrowser;
-    this.content = aContent;
     this.chrome = aChrome;
 
     this.version = "meeh";
@@ -138,14 +138,30 @@ let JSTermUI = {
   switchToContentMode: function() {
     let label = document.querySelector("#completion-candidates > label");
     let needMessage = !!this.sb;
-    this.sb = this.buildSandbox(this.content);
+    let content = this.browser.contentWindow;
+    this.sb = this.buildSandbox(content);
     if (this.completion) this.completion.destroy();
     this.completion = new JSCompletion(this.input, label, this.sb);
     if (needMessage) {
       this.print("// Switched to content mode.");
     }
     this.inputContainer.classList.remove("chrome");
-    window.document.title = "JSTerm: " + this.content.document.title;
+    window.document.title = "JSTerm: " + content.document.title;
+  },
+
+  ensureStillConnected: function() {
+    let isChrome = this.inputContainer.classList.contains("chrome");
+    if (isChrome) {
+      // Not supported yet
+      return;
+    }
+
+    if (this.target === this.browser.contentWindow) {
+      return;
+    }
+
+    this.sb = null;
+    this.switchToContentMode();
   },
 
   buildSandbox: function(win) {
@@ -160,6 +176,14 @@ let JSTermUI = {
     sb.$$ = function(aSelector) {
       return win.document.querySelectorAll(aSelector);
     };
+
+    sb.console.log = function(msg) {
+      this.print(msg);
+    }.bind(this);
+
+    sb.console.clear = function(msg) {
+      this.clear();
+    }.bind(this);
 
     return sb;
   },
