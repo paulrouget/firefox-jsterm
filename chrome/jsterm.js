@@ -24,34 +24,12 @@ let JSTermUI = {
   printQueue: "",
   printTimeout: null,
 
-  close: function() {
-    if (this.closing) return;
-    this.closing = true;
-    this.manager.closeForBrowser(this.browser);
-  },
-
-  closeIfInWindow: function() {
-    if (!this.closing && !this.manager.isTermDocked(this.browser)) {
-      this.close();
-    }
-  },
-
   registerCommands: function() {
     this.commands = [
-      {name: ":close", help: "close terminal",
-       exec: this.close.bind(this)},
       {name: ":clear", help: "clear screen",
        exec: this.clear.bind(this)},
       {name: ":help", help: "show this help",
        exec: this.help.bind(this)},
-      {name: ":content", help: "switch to Content mode",
-       exec: this.switchToContentMode.bind(this)},
-      {name: ":chrome", help: "switch to Chrome mode",
-       exec: this.switchToChromeMode.bind(this)},
-      {name: ":undock", help: "Move the terminal into its own window",
-       exec: this.undock.bind(this)},
-      {name: ":dock", help: "Move the terminal in browser",
-       exec: this.dock.bind(this)},
       {name: ":toggleLightTheme", help: "Toggle the light (white) theme",
        exec: this.toggleLightTheme.bind(this)},
       {name: "ls", hidden: true, exec: this.ls.bind(this)},
@@ -73,13 +51,15 @@ let JSTermUI = {
     this.input.focus();
   },
 
-  init: function(aManager, aGlobalHistory, aBrowser, aChrome, aDefaultContent) {
-    this.manager = aManager;
-    this.browser = aBrowser;
-    this.chrome = aChrome;
+  init: function(aGlobalHistory, aTarget) {
+    if (aTarget.type != "tab") {
+      throw "Only tabs are supported for the moment.";
+    }
+    this.target = aTarget.value.linkedBrowser.contentWindow;
+    let addonMgr = aTarget.value.ownerDocument.defaultView.AddonManager;
 
     this.version = "meeh";
-    this.chrome.AddonManager.getAddonByID("jsterm@paulrouget.com", function(addon) {
+    addonMgr.getAddonByID("jsterm@paulrouget.com", function(addon) {
       this.version = addon.version;
     }.bind(this));
 
@@ -90,15 +70,8 @@ let JSTermUI = {
     this.focus = this.focus.bind(this);
     this.container = document.querySelector("#editors-container");
 
-    let defaultInputText, defaultOutputText;
-
-    if (aDefaultContent) {
-      defaultInputText = aDefaultContent.input;
-      defaultOutputText = aDefaultContent.output;
-    } else {
-      defaultInputText = "";
-      defaultOutputText = "// type ':help' for help\n// Report bug here: https://github.com/paulrouget/firefox-jsterm/issues";
-    }
+    let defaultInputText = "";
+    let defaultOutputText = "// type ':help' for help\n// Report bug here: https://github.com/paulrouget/firefox-jsterm/issues";
 
     this.history = new JSTermLocalHistory(aGlobalHistory);
 
@@ -125,20 +98,10 @@ let JSTermUI = {
 
   },
 
-  switchToChromeMode: function() {
-    let label = document.querySelector("#completion-candidates > label");
-    this.sb = this.buildSandbox(this.chrome);
-    this.print("// Switched to chrome mode.");
-    if (this.completion) this.completion.destroy();
-    this.completion = new JSCompletion(this.input, label, this.sb);
-    this.inputContainer.classList.add("chrome");
-    window.document.title = "JSTerm: (chrome) " + this.chrome.document.title;
-  },
-
   switchToContentMode: function() {
     let label = document.querySelector("#completion-candidates > label");
     let needMessage = !!this.sb;
-    let content = this.browser.contentWindow;
+    let content = this.target;
     this.sb = this.buildSandbox(content);
     if (this.completion) this.completion.destroy();
     this.completion = new JSCompletion(this.input, label, this.sb);
@@ -147,21 +110,6 @@ let JSTermUI = {
     }
     this.inputContainer.classList.remove("chrome");
     window.document.title = "JSTerm: " + content.document.title;
-  },
-
-  ensureStillConnected: function() {
-    let isChrome = this.inputContainer.classList.contains("chrome");
-    if (isChrome) {
-      // Not supported yet
-      return;
-    }
-
-    if (this.target === this.browser.contentWindow) {
-      return;
-    }
-
-    this.sb = null;
-    this.switchToContentMode();
   },
 
   buildSandbox: function(win) {
@@ -401,7 +349,6 @@ let JSTermUI = {
     text += "\n * 'Return' to evaluate entry,";
     text += "\n * 'Tab' for autocompletion,";
     text += "\n * 'Ctrl-l' clear screen,";
-    text += "\n * 'Ctrl-d' close term,";
     text += "\n * 'up/down' to browser history,";
     text += "\n * 'Shift+Return' to switch to multiline editing,";
     text += "\n * 'Shift+Return' to evaluate multiline entry,";
@@ -448,11 +395,6 @@ let JSTermUI = {
       }
     }
 
-    if (e.keyCode == 68 && e.ctrlKey) {
-      e.stopPropagation();
-      e.preventDefault();
-      this.close();
-    }
     if (e.keyCode == 76 && e.ctrlKey) {
       e.stopPropagation();
       e.preventDefault();
@@ -544,18 +486,6 @@ let JSTermUI = {
       input: this.input.getText(),
       output: this.output.getText(),
     };
-  },
-
-  undock: function() {
-    if (this.manager.isTermDocked(this.browser)) {
-      this.manager.moveTermTo(this.browser, "own_window");
-    }
-  },
-
-  dock: function() {
-    if (!this.manager.isTermDocked(this.browser)) {
-      this.manager.moveTermTo(this.browser, "in_browser");
-    }
   },
 
   ls: function() {

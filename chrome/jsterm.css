@@ -1,6 +1,5 @@
 window {
-  background-color: #131c26;
-  background-image: url("chrome://browser/skin/devtools/responsive-background.png");
+  background-color: rgb(20,20,20);
   color: white;
   font-family: Monaco, monospace;
   font-size: 12px;
