@@ -1,7 +1,7 @@
 let Cu = Components.utils;
 let Ci = Components.interfaces;
 Cu.import("resource:///modules/source-editor.jsm");
-Cu.import("resource:///modules/WebConsoleUtils.jsm");
+Cu.import("resource://gre/modules/devtools/WebConsoleUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 
 /**
