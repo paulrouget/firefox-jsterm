@@ -15,17 +15,9 @@
         macanimationtype="document"
         screenX="4" screenY="4"
         width="640" height="480"
-        onunload="JSTermUI.closeIfInWindow()"
         persist="screenX screenY width height sizemode">
 
   <script type="application/javascript" src="jsterm.js"/>
-
-  <keyset id="jsterm-keyset">
-    <key id="jsterm-key-close"
-         key="&JSTerm.closeKey;"
-         oncommand="JSTermUI.closeIfInWindow()"
-         modifiers="accel"/>
-  </keyset>
 
   <hbox flex="1">
     <vbox flex="1">

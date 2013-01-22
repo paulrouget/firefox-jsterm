@@ -24,15 +24,7 @@ let JSTermUI = {
   printTimeout: null,
 
   close: function() {
-    if (this.closing) return;
-    this.closing = true;
-    this.manager.closeForBrowser(this.browser);
-  },
-
-  closeIfInWindow: function() {
-    if (!this.closing && !this.manager.isTermDocked(this.browser)) {
-      this.close();
-    }
+    this.toolbox.destroy();
   },
 
   registerCommands: function() {
@@ -47,10 +39,6 @@ let JSTermUI = {
        exec: this.switchToContentMode.bind(this)},
       {name: ":chrome", help: "switch to Chrome mode",
        exec: this.switchToChromeMode.bind(this)},
-      {name: ":undock", help: "Move the terminal into its own window",
-       exec: this.undock.bind(this)},
-      {name: ":dock", help: "Move the terminal in browser",
-       exec: this.dock.bind(this)},
       {name: ":toggleLightTheme", help: "Toggle the light (white) theme",
        exec: this.toggleLightTheme.bind(this)},
       {name: "ls", hidden: true, exec: this.ls.bind(this)},
@@ -72,13 +60,14 @@ let JSTermUI = {
     this.input.focus();
   },
 
-  init: function(aManager, aGlobalHistory, aBrowser, aContent, aChrome, aDefaultContent) {
-    this.manager = aManager;
-    this.browser = aBrowser;
-    this.content = aContent;
-    this.chrome = aChrome;
+  //init: function(aManager, aGlobalHistory, aBrowser, aContent, aChrome, aDefaultContent) {
+  init: function(aGlobalHistory, aToolbox) {
+    this.toolbox = aToolbox;
 
-    this.version = "meeh";
+    this.content = this.toolbox.target.tab.linkedBrowser.contentWindow;
+    this.chrome = this.toolbox.target.tab.ownerDocument.defaultView;
+
+    this.version = "n/a";
     this.chrome.AddonManager.getAddonByID("jsterm@paulrouget.com", function(addon) {
       this.version = addon.version;
     }.bind(this));
@@ -90,15 +79,8 @@ let JSTermUI = {
     this.focus = this.focus.bind(this);
     this.container = document.querySelector("#editors-container");
 
-    let defaultInputText, defaultOutputText;
-
-    if (aDefaultContent) {
-      defaultInputText = aDefaultContent.input;
-      defaultOutputText = aDefaultContent.output;
-    } else {
-      defaultInputText = "";
-      defaultOutputText = "// type ':help' for help\n// Report bug here: https://github.com/paulrouget/firefox-jsterm/issues";
-    }
+    let defaultInputText = "";
+    let defaultOutputText = "// type ':help' for help\n// Report bug here: https://github.com/paulrouget/firefox-jsterm/issues";
 
     this.history = new JSTermLocalHistory(aGlobalHistory);
 
@@ -520,18 +502,6 @@ let JSTermUI = {
       input: this.input.getText(),
       output: this.output.getText(),
     };
-  },
-
-  undock: function() {
-    if (this.manager.isTermDocked(this.browser)) {
-      this.manager.moveTermTo(this.browser, "own_window");
-    }
-  },
-
-  dock: function() {
-    if (!this.manager.isTermDocked(this.browser)) {
-      this.manager.moveTermTo(this.browser, "in_browser");
-    }
   },
 
   ls: function() {
