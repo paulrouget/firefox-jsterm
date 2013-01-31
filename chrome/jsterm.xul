@@ -32,6 +32,6 @@
       </vbox>
     </vbox>
     <splitter class="devtools-side-splitter"/>
-    <vbox hidden="true" width="300" id="object-inspector"/>
+    <vbox hidden="true" width="300" id="variables"/>
   </hbox>
 </window>

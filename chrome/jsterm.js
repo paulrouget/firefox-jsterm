@@ -100,7 +100,7 @@ let JSTermUI = {
       theme: "chrome://jsterm/content/orion.css",
     }, this.initInput.bind(this));
 
-    this.variableView = new VariablesView(document.querySelector("#object-inspector"));
+    this.variableView = new VariablesView(document.querySelector("#variables"));
 
     try { // This might be too early. But still, we try.
       if (Services.prefs.getBoolPref("devtools.jsterm.lightTheme")) {
@@ -482,7 +482,7 @@ let JSTermUI = {
   },
 
   inspect: function(obj) {
-    let box = document.querySelector("#object-inspector");
+    let box = document.querySelector("#variables");
     box.hidden = false;
     this.variableView.rawObject = obj;
     this.focus();
@@ -490,7 +490,7 @@ let JSTermUI = {
 
   hideObjInspector: function() {
     this.variableView.empty();
-    let box = document.querySelector("#object-inspector");
+    let box = document.querySelector("#variables");
     box.hidden = true;
   },
 

@@ -49,20 +49,6 @@ window {
   font-size: 12px;
 }
 
-#object-inspector {
-  max-height: 100%;
-  overflow: scroll;
-}
-
-#object-inspector > tree > treechildren::-moz-tree-row(odd) {
-  background-color: #0E151D;
-}
-
-#object-inspector > tree > treechildren::-moz-tree-row(selected) {
-  background-color: #26384E;
-  color: white;
-}
-
 /* -- Light Theme -- */
 
 window.light {
