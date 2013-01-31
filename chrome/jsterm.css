@@ -6,14 +6,6 @@ window {
   font-size: 12px;
 }
 
-#object-inspector > tree {
-  background: #131c26;
-  color: #8fa1b2;
-  font-family: Monaco, monospace;
-  font-weight: lighter;
-  font-size: 12px;
-}
-
 #editors-container {
   padding: 5px;
   overflow-y: auto;
@@ -57,17 +49,9 @@ window {
   font-size: 12px;
 }
 
-#object-inspector > tree {
-  border: 0;
-  -moz-appearance: none;
-  margin-left: 0;
-  margin-right: 0;
-}
-
-
-#object-inspector > tree > treechildren,
-#object-inspector > tree > treechildren::-moz-tree-row {
-  background: #131c26; /* Background of the editor */
+#object-inspector {
+  max-height: 100%;
+  overflow: scroll;
 }
 
 #object-inspector > tree > treechildren::-moz-tree-row(odd) {

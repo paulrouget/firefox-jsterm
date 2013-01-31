@@ -3,6 +3,7 @@ let Ci = Components.interfaces;
 Cu.import("resource:///modules/source-editor.jsm");
 Cu.import("resource://gre/modules/devtools/WebConsoleUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource:///modules/devtools/VariablesView.jsm");
 
 /**
  * Todo
@@ -10,7 +11,7 @@ Cu.import("resource://gre/modules/Services.jsm");
  * . Use jsm's
  * . delete listeners & map
  * . underline the current autocompletion item
- * . :connect (remote protocole)
+ * . :connect (remote protocol)
  * . ctrl-r
  */
 
@@ -98,6 +99,8 @@ let JSTermUI = {
       mode: SourceEditor.MODES.JAVASCRIPT,
       theme: "chrome://jsterm/content/orion.css",
     }, this.initInput.bind(this));
+
+    this.variableView = new VariablesView(document.querySelector("#object-inspector"));
 
     try { // This might be too early. But still, we try.
       if (Services.prefs.getBoolPref("devtools.jsterm.lightTheme")) {
@@ -478,23 +481,17 @@ let JSTermUI = {
     this.printTimeout = null;
   },
 
-  inspect: function(obj, filter) {
-    let treeview = this.treeview = new PropertyTreeView2();
-    treeview.data = {object:obj};
-    let tree = document.querySelector("#object-inspector > tree");
-    tree.view = treeview;
+  inspect: function(obj) {
     let box = document.querySelector("#object-inspector");
     box.hidden = false;
+    this.variableView.rawObject = obj;
     this.focus();
   },
 
   hideObjInspector: function() {
+    this.variableView.empty();
     let box = document.querySelector("#object-inspector");
     box.hidden = true;
-  },
-
-  filterObjInspector: function(input) {
-    this.treeview.filter(input.value);
   },
 
   getContent: function() {
@@ -696,334 +693,6 @@ JSCompletion.prototype = {
     this.editor = null;
   },
 }
-
-
-
-
-///////////////////////////////////////////////////////////////////////////
-//// PropertyTreeView2
-
-/**
- * This is an implementation of the nsITreeView interface. For comments on the
- * interface properties, see the documentation:
- * https://developer.mozilla.org/en/XPCOM_Interface_Reference/nsITreeView
- */
-var PropertyTreeView2 = function() {
-  this._rows = [];
-  this._objectCache = {};
-};
-
-PropertyTreeView2.prototype = {
-  /**
-   * Stores the visible rows of the tree.
-   * @private
-   */
-  _rows: null,
-
-  /**
-   * Stores the nsITreeBoxObject for this tree.
-   * @private
-   */
-  _treeBox: null,
-
-  /**
-   * Stores cached information about local objects being inspected.
-   * @private
-   */
-  _objectCache: null,
-
-  /**
-   * Use this setter to update the content of the tree.
-   *
-   * @param object aData
-   *        A meta object that holds information about the object you want to
-   *        display in the property panel. Object properties:
-   *        - object:
-   *        This is the raw object you want to display. You can only provide
-   *        this object if you want the property panel to work in sync mode.
-   *        - remoteObject:
-   *        An array that holds information on the remote object being
-   *        inspected. Each element in this array describes each property in the
-   *        remote object. See WebConsoleUtils.namesAndValuesOf() for details.
-   *        - rootCacheId:
-   *        The cache ID where the objects referenced in remoteObject are found.
-   *        - panelCacheId:
-   *        The cache ID where any object retrieved by this property panel
-   *        instance should be stored into.
-   *        - remoteObjectProvider:
-   *        A function that is invoked when a new object is needed. This is
-   *        called when the user tries to expand an inspectable property. The
-   *        callback must take four arguments:
-   *          - fromCacheId:
-   *          Tells from where to retrieve the object the user picked (from
-   *          which cache ID).
-   *          - objectId:
-   *          The object ID the user wants.
-   *          - panelCacheId:
-   *          Tells in which cache ID to store the objects referenced by
-   *          objectId so they can be retrieved later.
-   *          - callback:
-   *          The callback function to be invoked when the remote object is
-   *          received. This function takes one argument: the raw message
-   *          received from the Web Console content script.
-   */
-  set data(aData) {
-    let oldLen = this._rows.length;
-
-    this._cleanup();
-
-    if (!aData) {
-      return;
-    }
-
-    if (aData.remoteObject) {
-      this._rootCacheId = aData.rootCacheId;
-      this._panelCacheId = aData.panelCacheId;
-      this._remoteObjectProvider = aData.remoteObjectProvider;
-      this._rows = [].concat(aData.remoteObject);
-      this._updateRemoteObject(this._rows, 0);
-    }
-    else if (aData.object) {
-      this._rows = this._inspectObject(aData.object);
-    }
-    else {
-      throw new Error("First argument must have a .remoteObject or " +
-                      "an .object property!");
-    }
-
-    this._unfilteredRows = this._rows;
-
-    if (this._treeBox) {
-      this._treeBox.beginUpdateBatch();
-      if (oldLen) {
-        this._treeBox.rowCountChanged(0, -oldLen);
-      }
-      this._treeBox.rowCountChanged(0, this._rows.length);
-      this._treeBox.endUpdateBatch();
-    }
-  },
-
-  /**
-   * Update a remote object so it can be used with the tree view. This method
-   * adds properties to each array element.
-   *
-   * @private
-   * @param array aObject
-   *        The remote object you want prepared for use with the tree view.
-   * @param number aLevel
-   *        The level you want to give to each property in the remote object.
-   */
-  _updateRemoteObject: function PTV__updateRemoteObject(aObject, aLevel)
-  {
-    aObject.forEach(function(aElement) {
-      aElement.level = aLevel;
-      aElement.isOpened = false;
-      aElement.children = null;
-    });
-  },
-
-  /**
-   * Inspect a local object.
-   *
-   * @private
-   * @param object aObject
-   *        The object you want to inspect.
-   */
-  _inspectObject: function PTV__inspectObject(aObject, filter)
-  {
-    this._objectCache = {};
-    this._remoteObjectProvider = this._localObjectProvider.bind(this);
-    let children = WebConsoleUtils.namesAndValuesOf(aObject, this._objectCache);
-    this._updateRemoteObject(children, 0);
-    return children;
-  },
-
-  /**
-   * An object provider for when the user inspects local objects (not remote
-   * ones).
-   *
-   * @private
-   * @param string aFromCacheId
-   *        The cache ID from where to retrieve the desired object.
-   * @param string aObjectId
-   *        The ID of the object you want.
-   * @param string aDestCacheId
-   *        The ID of the cache where to store any objects referenced by the
-   *        desired object.
-   * @param function aCallback
-   *        The function you want to receive the object.
-   */
-  _localObjectProvider:
-  function PTV__localObjectProvider(aFromCacheId, aObjectId, aDestCacheId,
-                                    aCallback)
-  {
-    let object = WebConsoleUtils.namesAndValuesOf(this._objectCache[aObjectId],
-                                                  this._objectCache);
-    aCallback({cacheId: aFromCacheId,
-               objectId: aObjectId,
-               object: object,
-               childrenCacheId: aDestCacheId || aFromCacheId,
-    });
-  },
-
-  /** nsITreeView interface implementation **/
-
-  selection: null,
-
-  get rowCount()                     { return this._rows.length; },
-  setTree: function(treeBox)         { this._treeBox = treeBox;  },
-  getCellText: function(idx, column) {
-    let row = this._rows[idx];
-    if (column.id == "propName") {
-      return row.name;
-    } else {
-      return row.value;
-    }
-  },
-  getLevel: function(idx) {
-    return this._rows[idx].level;
-  },
-  isContainer: function(idx) {
-    return !!this._rows[idx].inspectable;
-  },
-  isContainerOpen: function(idx) {
-    return this._rows[idx].isOpened;
-  },
-  isContainerEmpty: function(idx)    { return false; },
-  isSeparator: function(idx)         { return false; },
-  isSorted: function()               { return false; },
-  isEditable: function(idx, column)  { return false; },
-  isSelectable: function(row, col)   { return true; },
-
-  getParentIndex: function(idx)
-  {
-    if (this.getLevel(idx) == 0) {
-      return -1;
-    }
-    for (var t = idx - 1; t >= 0; t--) {
-      if (this.isContainer(t)) {
-        return t;
-      }
-    }
-    return -1;
-  },
-
-  hasNextSibling: function(idx, after)
-  {
-    var thisLevel = this.getLevel(idx);
-    return this._rows.slice(after + 1).some(function (r) r.level == thisLevel);
-  },
-
-  toggleOpenState: function(idx)
-  {
-    let item = this._rows[idx];
-    if (!item.inspectable) {
-      return;
-    }
-
-    if (item.isOpened) {
-      this._treeBox.beginUpdateBatch();
-      item.isOpened = false;
-
-      var thisLevel = item.level;
-      var t = idx + 1, deleteCount = 0;
-      while (t < this._rows.length && this.getLevel(t++) > thisLevel) {
-        deleteCount++;
-      }
-
-      if (deleteCount) {
-        this._rows.splice(idx + 1, deleteCount);
-        this._treeBox.rowCountChanged(idx + 1, -deleteCount);
-      }
-      this._treeBox.invalidateRow(idx);
-      this._treeBox.endUpdateBatch();
-    }
-    else {
-      let levelUpdate = true;
-      let callback = function _onRemoteResponse(aResponse) {
-        this._treeBox.beginUpdateBatch();
-        item.isOpened = true;
-
-        if (levelUpdate) {
-          this._updateRemoteObject(aResponse.object, item.level + 1);
-          item.children = aResponse.object;
-        }
-
-        this._rows.splice.apply(this._rows, [idx + 1, 0].concat(item.children));
-
-        this._treeBox.rowCountChanged(idx + 1, item.children.length);
-        this._treeBox.invalidateRow(idx);
-        this._treeBox.endUpdateBatch();
-      }.bind(this);
-
-      if (!item.children) {
-        let fromCacheId = item.level > 0 ? this._panelCacheId :
-                                           this._rootCacheId;
-        this._remoteObjectProvider(fromCacheId, item.objectId,
-                                   this._panelCacheId, callback);
-      }
-      else {
-        levelUpdate = false;
-        callback({object: item.children});
-      }
-    }
-  },
-
-  getImageSrc: function(idx, column) { },
-  getProgressMode : function(idx,column) { },
-  getCellValue: function(idx, column) { },
-  cycleHeader: function(col, elem) { },
-  selectionChanged: function() { },
-  cycleCell: function(idx, column) { },
-  performAction: function(action) { },
-  performActionOnCell: function(action, index, column) { },
-  performActionOnRow: function(action, row) { },
-  getRowProperties: function(idx, column, prop) { },
-  getCellProperties: function(idx, column, prop) { },
-  getColumnProperties: function(column, element, prop) { },
-
-  setCellValue: function(row, col, value)               { },
-  setCellText: function(row, col, value)                { },
-  drop: function(index, orientation, dataTransfer)      { },
-  canDrop: function(index, orientation, dataTransfer)   { return false; },
-
-  _cleanup: function PTV__cleanup()
-  {
-    if (this._rows.length) {
-      // Reset the existing _rows children to the initial state.
-      this._updateRemoteObject(this._rows, 0);
-      this._rows = [];
-    }
-
-    delete this._objectCache;
-    delete this._rootCacheId;
-    delete this._panelCacheId;
-    delete this._remoteObjectProvider;
-  },
-
-  /* Filter mechanism */
-  filter: function(filter) {
-    let oldLen = this._rows.length;
-    let treeview = this;
-
-    let reverse = false;
-    if (filter.length > 1 && filter[0] == "-") {
-      filter = filter.substr(1);
-      reverse = true;
-    }
-
-    let regex = new RegExp(filter, "i");
-    this._rows = this._unfilteredRows.filter(function(e, idx) {
-      e.isOpened = false;
-      if (reverse) {
-        return !regex.test(e.name) && !regex.test(e.value);
-      }
-      return regex.test(e.name) || regex.test(e.value);
-    });
-    this._treeBox.rowCountChanged(0, -oldLen);
-    this._treeBox.rowCountChanged(0, this._rows.length);
-  },
-};
 
 /** HISTORY **/
 

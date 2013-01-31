@@ -1,5 +1,7 @@
 <?xml version="1.0"?>
 <?xml-stylesheet href="chrome://browser/skin/devtools/common.css" type="text/css"?>
+<?xml-stylesheet href="chrome://browser/content/debugger.css" type="text/css"?>
+<?xml-stylesheet href="chrome://browser/skin/devtools/debugger.css" type="text/css"?>
 <?xml-stylesheet href="chrome://jsterm/content/jsterm.css" type="text/css"?>
 
 <!DOCTYPE window [
@@ -30,19 +32,6 @@
       </vbox>
     </vbox>
     <splitter class="devtools-side-splitter"/>
-    <vbox hidden="true" width="300" id="object-inspector">
-      <toolbar class="devtools-toolbar">
-        <textbox type="search" class="devtools-searchinput" oninput="JSTermUI.filterObjInspector(this)" emptytext="filter"/>
-        <spacer flex="1"/>
-        <toolbarbutton class="devtools-closebutton" onclick="JSTermUI.hideObjInspector()"/>
-      </toolbar>
-      <tree hidecolumnpicker="true" flex="1">
-        <treecols>
-          <treecol hideheader="true" id="propName" primary="true" flex="3"/>
-          <treecol hideheader="true" id="propValue" flex="2"/>
-        </treecols>
-        <treechildren/>
-      </tree>
-    </vbox>
+    <vbox hidden="true" width="300" id="object-inspector"/>
   </hbox>
 </window>
