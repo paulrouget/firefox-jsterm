@@ -6,7 +6,10 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource:///modules/devtools/gDevTools.jsm");
-Cu.import("resource://gre/modules/commonjs/promise/core.js");
+
+/* Depending on the version of Firefox, promise module can have different path */
+try { Cu.import("resource://gre/modules/commonjs/promise/core.js"); } catch(e) {}
+try { Cu.import("resource://gre/modules/commonjs/sdk/core/promise.js"); } catch(e) {}
 
 XPCOMUtils.defineLazyGetter(this, "osString",
                             function() Cc["@mozilla.org/xre/app-info;1"].getService(Ci.nsIXULRuntime).OS);
