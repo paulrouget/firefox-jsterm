@@ -19,7 +19,9 @@
         width="640" height="480"
         persist="screenX screenY width height sizemode">
 
-  <script type="application/javascript" src="coffee-script.js"/>
+  <script type="application/javascript" src="vendor/coffee-script.js"/>
+  <script type="application/javascript" src="vendor/livescript.js"/>
+  <script type="application/javascript" src="vendor/prelude-ls.js"/>
   <script type="application/javascript" src="jsterm.js"/>
 
   <hbox flex="1">

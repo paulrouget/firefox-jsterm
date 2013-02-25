@@ -17,6 +17,18 @@ Cu.import("resource:///modules/devtools/VariablesView.jsm");
 
 const JSTERM_MARK = "orion.annotation.jstermobject";
 
+const compilers = {
+  js: function(input) {
+    return input;
+  },
+  coffee: function(input) {
+    return CoffeeScript.compile(input, {bare: true}).trim();
+  },
+  livescript: function(input) {
+    return LiveScript.compile(input, {bare: true}).trim();
+  }
+};
+
 let JSTermUI = {
   input: new SourceEditor(),
   output: new SourceEditor(),
@@ -40,6 +52,8 @@ let JSTermUI = {
        exec: this.switchToLanguage.bind(this, 'js')},
       {name: ":coffee", help: "switch to CoffeeScript language",
        exec: this.switchToLanguage.bind(this, 'coffee')},
+      {name: ":livescript", help: "switch to LiveScript language",
+       exec: this.switchToLanguage.bind(this, 'livescript')},
       {name: ":content", help: "switch to Content mode",
        exec: this.switchToContentMode.bind(this)},
       {name: ":chrome", help: "switch to Chrome mode",
@@ -71,7 +85,7 @@ let JSTermUI = {
 
     this.content = this.toolbox.target.tab.linkedBrowser.contentWindow;
     this.chrome = this.toolbox.target.tab.ownerDocument.defaultView;
-    this.switchToLanguage('js');
+    this.switchToLanguage('livescript');
     this.logCompiledCode = false;
 
     this.version = "n/a";
@@ -128,18 +142,7 @@ let JSTermUI = {
 
   switchToLanguage: function(language) {
     this.languageName = language;
-
-    let languages = {js: {}, coffee: {}};
-
-    languages.js.compile = function(input) {
-      return input;
-    }.bind(this);
-
-    languages.coffee.compile = function(input) {
-      return CoffeeScript.compile(input, {bare: true}).trim();
-    }.bind(this);
-
-    this.language = languages[language];
+    this.compile = compilers[language].bind(this);
   },
 
   switchToContentMode: function() {
@@ -167,6 +170,16 @@ let JSTermUI = {
     sb.$$ = function(aSelector) {
       return win.document.querySelectorAll(aSelector);
     };
+
+    if (this.languageName === 'livescript') {
+      for (let key in prelude) {
+        if (!(({}).hasOwnProperty.call(win, key))) {
+          try {
+            sb[key] = prelude[key];
+          } catch(ex) {}
+        }
+      }
+    }
 
     return sb;
   },
@@ -291,7 +304,7 @@ let JSTermUI = {
     let code;
 
     try {
-      code = this.language.compile(rawCode);
+      code = this.compile(rawCode);
     } catch(ex) {
       this.dumpEntryResult('', ex.toString().slice(7), rawCode);
       this.onceEntryResultPrinted();
