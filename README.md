@@ -3,8 +3,16 @@
 This Firefox addon contains full-featured console that supports
 JS, [CoffeeScript](http://coffeescript.org) and [LiveScript](http://livescript.net).
 
-Unlike Chrome addons like [CoffeeConsole](https://github.com/snookca/CoffeeConsole),
-this one supports DOM interactions which make scripting of pages very fast.
+Chrome coffeescript addons
+like [CoffeeConsole](https://github.com/snookca/CoffeeConsole) cannot
+manipulate DOM or play nicely (or even reasonably) with window properties.
+They’re just shortcuts for coffeescript.org, which just compiles coffee down
+to JS. This seems useless to me, because I want coffeescript as first-class
+browser citizen. Some time ago, Mozilla introduced new awesome dev tools APIs
+which allowed to make this addon.
+
+Info and screencast are available at http://paulrouget.com/e/jsterm/. To switch between languages, use `:js`, `:coffee` & `:livescript`.
+The language you choose will be saved for the next console session.
 
 Screenshot:
 
