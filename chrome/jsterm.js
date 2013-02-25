@@ -163,21 +163,24 @@ let JSTermUI = {
     this.target = win;
     sb.print = this.print.bind(this);
 
-    sb.$ = function(aSelector) {
-      return win.document.querySelector(aSelector);
+    let defineProp = function(name, prop) {
+      if (hasOwnProperty.call(sb, name)) return;
+      try {
+        sb[name] = prop
+      } catch(ex) {}
     };
 
-    sb.$$ = function(aSelector) {
+    defineProp('$', function(aSelector) {
+      return win.document.querySelector(aSelector);
+    });
+
+    defineProp('$$', function(aSelector) {
       return win.document.querySelectorAll(aSelector);
-    };
+    });
 
     if (this.languageName === 'livescript') {
       for (let key in prelude) {
-        if (!(({}).hasOwnProperty.call(win, key))) {
-          try {
-            sb[key] = prelude[key];
-          } catch(ex) {}
-        }
+        defineProp(key, prelude[key]);
       }
     }
 
