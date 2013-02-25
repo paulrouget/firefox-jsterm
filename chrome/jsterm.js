@@ -36,6 +36,10 @@ let JSTermUI = {
        exec: this.clear.bind(this)},
       {name: ":help", help: "show this help",
        exec: this.help.bind(this)},
+      {name: ":js", help: "switch to JS language",
+       exec: this.switchToLanguage.bind(this, 'js')},
+      {name: ":coffee", help: "switch to CoffeeScript language",
+       exec: this.switchToLanguage.bind(this, 'coffee')},
       {name: ":content", help: "switch to Content mode",
        exec: this.switchToContentMode.bind(this)},
       {name: ":chrome", help: "switch to Chrome mode",
@@ -67,6 +71,8 @@ let JSTermUI = {
 
     this.content = this.toolbox.target.tab.linkedBrowser.contentWindow;
     this.chrome = this.toolbox.target.tab.ownerDocument.defaultView;
+    this.switchToLanguage('js');
+    this.logCompiledCode = false;
 
     this.version = "n/a";
     this.chrome.AddonManager.getAddonByID("jsterm@paulrouget.com", function(addon) {
@@ -118,6 +124,22 @@ let JSTermUI = {
     this.completion = new JSCompletion(this.input, label, this.sb);
     this.inputContainer.classList.add("chrome");
     window.document.title = "JSTerm: (chrome) " + this.chrome.document.title;
+  },
+
+  switchToLanguage: function(language) {
+    this.languageName = language;
+
+    let languages = {js: {}, coffee: {}};
+
+    languages.js.compile = function(input) {
+      return input;
+    }.bind(this);
+
+    languages.coffee.compile = function(input) {
+      return CoffeeScript.compile(input, {bare: true}).trim();
+    }.bind(this);
+
+    this.language = languages[language];
   },
 
   switchToContentMode: function() {
@@ -241,31 +263,44 @@ let JSTermUI = {
     }.bind(this));
   },
 
-  newEntry: function(code) {
+  newEntry: function(rawCode) {
     if (this.evaluating) return;
     this.evaluating = true;
 
     this.history.stopBrowsing();
-    this.history.add(code);
+    this.history.add(rawCode);
 
     this.input.setText("");
     this.multiline = false;
 
-    if (code == "") {
+    if (rawCode == "") {
       this.print();
       this.onceEntryResultPrinted();
       return;
     }
 
-    this.print(code);
-
     for (let cmd of this.commands) {
-      if (cmd.name == code) {
+      if (cmd.name == rawCode) {
+        this.print(rawCode);
         cmd.exec();
         this.onceEntryResultPrinted();
         return;
       }
     }
+
+    let code;
+
+    try {
+      code = this.language.compile(rawCode);
+    } catch(ex) {
+      this.dumpEntryResult('', ex.toString().slice(7), rawCode);
+      this.onceEntryResultPrinted();
+      return;
+    }
+
+    var output = this.languageName != 'js' && this.logCompiledCode ?
+      rawCode + '\n\n/*' + code + '*/' : rawCode;
+    this.print(output);
 
     let error, result;
     try {
