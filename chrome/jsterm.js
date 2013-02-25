@@ -547,7 +547,7 @@ let JSTermUI = {
 
   destroy: function() {
     this.input.editorElement.removeEventListener("keydown", this.handleKeys, true);
-    this.completion.destroy();
+    if (this.completion) this.completion.destroy();
     this.completion = null;
     this.treeview = null;
     this.input = null;
