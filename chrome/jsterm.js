@@ -29,6 +29,12 @@ const compilers = {
   }
 };
 
+let serialiseNode = function(node) {
+  var tag = node.tagName.toLowerCase();
+  var id = node.id ? '#' + node.id : '';
+  return '<' + tag + id  + '>';
+};
+
 let JSTermUI = {
   input: new SourceEditor(),
   output: new SourceEditor(),
@@ -325,7 +331,7 @@ let JSTermUI = {
       error = ex;
     }
 
-    this.dumpEntryResult(result, error, code);
+    this.dumpEntryResult(result, error, rawCode);
     this.onceEntryResultPrinted();
   },
 
@@ -352,21 +358,35 @@ let JSTermUI = {
       return;
     }
 
-    let isAnArray = Array.isArray(result);
-    let isAnObject = !isAnArray && ((typeof result) == "object");
-    let isAFunction = ((typeof result) == "function");
-    let isAString = (typeof result) == "string";
+    let maxLength = 80;
+    let type = ({}).toString.call(result).slice(8, -1);
+    let isAnObject = typeof result == "object";
+    let elementClass = /^HTML\w+Element$/;
 
     let resultStr;
-    if (result === undefined) {
-      resultStr = "undefined";
-    } else if(result === null) {
-      resultStr = "null";
+    if (result == null) {
+      resultStr = "" + result;
       isAnObject = false;
-    } else if (isAString) {
+    } else if (type == "String") {
       resultStr = "\"" + result + "\"";
-    } else if (isAnArray) {
-      resultStr = "[" + result.join(", ") + "]";
+    } else if (type == "NodeList") {
+      let isEmpty = result.length == 0;
+      let tagNames = [].slice.call(result).map(serialiseNode);
+      resultStr = "[" + tagNames.join(", ") + "]";
+    } else if (elementClass.test(type)) {
+      resultStr = serialiseNode(result);
+    } else if (isAnObject && 'length' in result) {
+      let serialised = [].slice.call(result)
+        .map(function(item) {
+          let cls = toString.call(item).slice(8, -1);
+          if (elementClass.test(cls)) {
+            return serialiseNode(item);
+          } else {
+            return item;
+          }
+        })
+        .join(", ");
+      resultStr = "[" + serialised + "]";
     } else {
       resultStr = result.toString();
     }
@@ -375,15 +395,20 @@ let JSTermUI = {
       return;
     }
 
+    // TODO: Check for long output that looks shitty.
+    // if (resultStr.length > maxLength) {
+    //   resultStr = resultStr.slice(0, maxLength) + ' ...';
+    // }
+
     if (isAnObject) {
       resultStr += " [+]";
     }
 
     if (this.isMultiline(resultStr)) {
-      if (!isAFunction) {
-        resultStr = "\n/*\n" + resultStr + "\n*/";
-      } else {
+      if (type == "Function") {
         resultStr = "\n" + resultStr;
+      } else {
+        resultStr = "\n/*\n" + resultStr + "\n*/";
       }
     } else {
       if (this.isMultiline(code)) {
@@ -530,6 +555,7 @@ let JSTermUI = {
     this.objects = null;
     this.printQueue = null;
     this.printTimeout = null;
+    this.compile = null;
   },
 
   inspect: function(obj) {
