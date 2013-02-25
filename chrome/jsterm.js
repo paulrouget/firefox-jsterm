@@ -41,6 +41,7 @@ let JSTermUI = {
   objects: new Map(),
   printQueue: "",
   printTimeout: null,
+  logCompiledCode: false,
 
   close: function() {
     this.toolbox.destroy();
@@ -91,8 +92,6 @@ let JSTermUI = {
 
     this.content = this.toolbox.target.tab.linkedBrowser.contentWindow;
     this.chrome = this.toolbox.target.tab.ownerDocument.defaultView;
-    this.switchToLanguage('livescript');
-    this.logCompiledCode = false;
 
     this.version = "n/a";
     this.chrome.AddonManager.getAddonByID("jsterm@paulrouget.com", function(addon) {
@@ -128,12 +127,19 @@ let JSTermUI = {
 
     this.variableView = new VariablesView(document.querySelector("#variables"));
 
+    let pref = "devtools.jsterm.language";
+    if (Services.prefs.prefHasUserValue(pref)) {
+      this.languageName = Services.prefs.getCharPref(pref);
+    } else {
+      this.languageName = 'js';
+    }
+    this.compile = compilers[this.languageName];
+
     try { // This might be too early. But still, we try.
       if (Services.prefs.getBoolPref("devtools.jsterm.lightTheme")) {
         this._setLightTheme();
       }
     } catch(e){}
-
   },
 
   switchToChromeMode: function() {
@@ -148,7 +154,14 @@ let JSTermUI = {
 
   switchToLanguage: function(language) {
     this.languageName = language;
+    Services.prefs.setCharPref("devtools.jsterm.language", language);
     this.compile = compilers[language].bind(this);
+
+    if (language == "livescript") {
+      for (let key in prelude) {
+        this.defineSandboxProp(key, prelude[key]);
+      }
+    }
   },
 
   switchToContentMode: function() {
@@ -157,6 +170,7 @@ let JSTermUI = {
     this.sb = this.buildSandbox(this.content);
     if (this.completion) this.completion.destroy();
     this.completion = new JSCompletion(this.input, label, this.sb);
+
     if (needMessage) {
       this.print("// Switched to content mode.");
     }
@@ -169,28 +183,28 @@ let JSTermUI = {
     this.target = win;
     sb.print = this.print.bind(this);
 
-    let defineProp = function(name, prop) {
-      if (hasOwnProperty.call(sb, name)) return;
-      try {
-        sb[name] = prop
-      } catch(ex) {}
-    };
-
-    defineProp('$', function(aSelector) {
+    this.defineSandboxProp('$', function(aSelector) {
       return win.document.querySelector(aSelector);
-    });
+    }, sb);
 
-    defineProp('$$', function(aSelector) {
+    this.defineSandboxProp('$$', function(aSelector) {
       return win.document.querySelectorAll(aSelector);
-    });
+    }, sb);
 
-    if (this.languageName === 'livescript') {
+    if (this.languageName == "livescript") {
       for (let key in prelude) {
-        defineProp(key, prelude[key]);
+        this.defineSandboxProp(key, prelude[key], sb);
       }
     }
 
     return sb;
+  },
+
+  defineSandboxProp: function(name, prop, sandbox = this.sb) {
+    if (hasOwnProperty.call(sandbox, name)) return;
+    try {
+      sandbox[name] = prop
+    } catch(ex) {}
   },
 
   print: function(msg = "", startWith = "\n", isAnObject = false, object = null) {
