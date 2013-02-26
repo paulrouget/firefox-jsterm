@@ -340,7 +340,7 @@ let JSTermUI = {
 
     let error, result;
     try {
-      result = Cu.evalInSandbox('(' + code + ')', this.sb, "1.8", "JSTerm", 1);
+      result = Cu.evalInSandbox(code, this.sb, "1.8", "JSTerm", 1);
     } catch (ex) {
       error = ex;
     }
