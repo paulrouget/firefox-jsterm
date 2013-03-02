@@ -61,6 +61,8 @@ let JSTermUI = {
        exec: this.switchToLanguage.bind(this, 'coffee')},
       {name: ":livescript", help: "switch to LiveScript language",
        exec: this.switchToLanguage.bind(this, 'livescript')},
+      {name: ":logCompiled", help: "log compiled code for non-js languages"
+        exec: this.logCompiled.bind(this)},
       {name: ":content", help: "switch to Content mode",
        exec: this.switchToContentMode.bind(this)},
       {name: ":chrome", help: "switch to Chrome mode",
@@ -162,6 +164,10 @@ let JSTermUI = {
         this.defineSandboxProp(key, prelude[key]);
       }
     }
+  },
+
+  logCompiled: function() {
+    this.logCompiledCode = !this.logCompiledCode;
   },
 
   switchToContentMode: function() {
