@@ -29,7 +29,7 @@ const compilers = {
   }
 };
 
-let serialiseNode = function(node) {
+let serializeNode = function(node) {
   var tag = node.tagName.toLowerCase();
   var id = node.id ? '#' + node.id : '';
   return '<' + tag + id  + '>';
@@ -391,22 +391,22 @@ let JSTermUI = {
       resultStr = "\"" + result + "\"";
     } else if (type == "NodeList") {
       let isEmpty = result.length == 0;
-      let tagNames = [].slice.call(result).map(serialiseNode);
+      let tagNames = [].slice.call(result).map(serializeNode);
       resultStr = "[" + tagNames.join(", ") + "]";
     } else if (elementClass.test(type)) {
-      resultStr = serialiseNode(result);
+      resultStr = serializeNode(result);
     } else if (isAnObject && 'length' in result) {
-      let serialised = [].slice.call(result)
+      let serialized = [].slice.call(result)
         .map(function(item) {
           let cls = toString.call(item).slice(8, -1);
           if (elementClass.test(cls)) {
-            return serialiseNode(item);
+            return serializeNode(item);
           } else {
             return item;
           }
         })
         .join(", ");
-      resultStr = "[" + serialised + "]";
+      resultStr = "[" + serialized + "]";
     } else {
       resultStr = result.toString();
     }
