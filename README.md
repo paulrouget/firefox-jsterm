@@ -14,3 +14,6 @@ Screenshot:
 ## Installation
 
 Drag’n’drop .xpi on your Firefox.
+
+If you prefer stable versions, you can
+[install the addon from addons.mozilla.org](https://addons.mozilla.org/en-US/firefox/addon/javascript-terminal/).
