@@ -4,13 +4,13 @@
   <r:Description about="urn:mozilla:install-manifest">
     <creator>Paul Rouget</creator>
     <id>jsterm@paulrouget.com</id>
-    <name>JavaScript Terminal</name>
+    <name>Firefox Terminal</name>
     <version>3</version>
     <bootstrap>true</bootstrap>
     <type>2</type>
     <iconURL>chrome://jsterm/content/icon.png</iconURL>
     <homepageURL>http://github.com/paulrouget/firefox-jsterm</homepageURL>
-    <description>JavaScript Terminal for Firefox</description>
+    <description>JavaScript, CoffeeScript and LiveScript Terminal for Firefox</description>
 
     <!-- Firefox -->
     <targetApplication>
