@@ -17,12 +17,31 @@ Cu.import("resource:///modules/devtools/VariablesView.jsm");
 
 const JSTERM_MARK = "orion.annotation.jstermobject";
 
+const compilers = {
+  js: function(input) {
+    return input;
+  },
+  coffee: function(input) {
+    return CoffeeScript.compile(input, {bare: true}).trim();
+  },
+  livescript: function(input) {
+    return LiveScript.compile(input, {bare: true}).trim();
+  }
+};
+
+let serializeNode = function(node) {
+  var tag = node.tagName.toLowerCase();
+  var id = node.id ? '#' + node.id : '';
+  return '<' + tag + id  + '>';
+};
+
 let JSTermUI = {
   input: new SourceEditor(),
   output: new SourceEditor(),
   objects: new Map(),
   printQueue: "",
   printTimeout: null,
+  logCompiledCode: false,
 
   close: function() {
     this.toolbox.destroy();
@@ -36,6 +55,14 @@ let JSTermUI = {
        exec: this.clear.bind(this)},
       {name: ":help", help: "show this help",
        exec: this.help.bind(this)},
+      {name: ":js", help: "switch to JS language",
+       exec: this.switchToLanguage.bind(this, 'js')},
+      {name: ":coffee", help: "switch to CoffeeScript language",
+       exec: this.switchToLanguage.bind(this, 'coffee')},
+      {name: ":livescript", help: "switch to LiveScript language",
+       exec: this.switchToLanguage.bind(this, 'livescript')},
+      {name: ":logCompiled", help: "log compiled code for non-js languages"
+        exec: this.logCompiled.bind(this)},
       {name: ":content", help: "switch to Content mode",
        exec: this.switchToContentMode.bind(this)},
       {name: ":chrome", help: "switch to Chrome mode",
@@ -102,12 +129,19 @@ let JSTermUI = {
 
     this.variableView = new VariablesView(document.querySelector("#variables"));
 
+    let pref = "devtools.jsterm.language";
+    if (Services.prefs.prefHasUserValue(pref)) {
+      this.languageName = Services.prefs.getCharPref(pref);
+    } else {
+      this.languageName = 'js';
+    }
+    this.compile = compilers[this.languageName];
+
     try { // This might be too early. But still, we try.
       if (Services.prefs.getBoolPref("devtools.jsterm.lightTheme")) {
         this._setLightTheme();
       }
     } catch(e){}
-
   },
 
   switchToChromeMode: function() {
@@ -120,12 +154,29 @@ let JSTermUI = {
     window.document.title = "JSTerm: (chrome) " + this.chrome.document.title;
   },
 
+  switchToLanguage: function(language) {
+    this.languageName = language;
+    Services.prefs.setCharPref("devtools.jsterm.language", language);
+    this.compile = compilers[language].bind(this);
+
+    if (language == "livescript") {
+      for (let key in prelude) {
+        this.defineSandboxProp(key, prelude[key]);
+      }
+    }
+  },
+
+  logCompiled: function() {
+    this.logCompiledCode = !this.logCompiledCode;
+  },
+
   switchToContentMode: function() {
     let label = document.querySelector("#completion-candidates > label");
     let needMessage = !!this.sb;
     this.sb = this.buildSandbox(this.content);
     if (this.completion) this.completion.destroy();
     this.completion = new JSCompletion(this.input, label, this.sb);
+
     if (needMessage) {
       this.print("// Switched to content mode.");
     }
@@ -138,15 +189,28 @@ let JSTermUI = {
     this.target = win;
     sb.print = this.print.bind(this);
 
-    sb.$ = function(aSelector) {
+    this.defineSandboxProp('$', function(aSelector) {
       return win.document.querySelector(aSelector);
-    };
+    }, sb);
 
-    sb.$$ = function(aSelector) {
+    this.defineSandboxProp('$$', function(aSelector) {
       return win.document.querySelectorAll(aSelector);
-    };
+    }, sb);
+
+    if (this.languageName == "livescript") {
+      for (let key in prelude) {
+        this.defineSandboxProp(key, prelude[key], sb);
+      }
+    }
 
     return sb;
+  },
+
+  defineSandboxProp: function(name, prop, sandbox = this.sb) {
+    if (hasOwnProperty.call(sandbox, name)) return;
+    try {
+      sandbox[name] = prop
+    } catch(ex) {}
   },
 
   print: function(msg = "", startWith = "\n", isAnObject = false, object = null) {
@@ -241,31 +305,44 @@ let JSTermUI = {
     }.bind(this));
   },
 
-  newEntry: function(code) {
+  newEntry: function(rawCode) {
     if (this.evaluating) return;
     this.evaluating = true;
 
     this.history.stopBrowsing();
-    this.history.add(code);
+    this.history.add(rawCode);
 
     this.input.setText("");
     this.multiline = false;
 
-    if (code == "") {
+    if (rawCode == "") {
       this.print();
       this.onceEntryResultPrinted();
       return;
     }
 
-    this.print(code);
-
     for (let cmd of this.commands) {
-      if (cmd.name == code) {
+      if (cmd.name == rawCode) {
+        this.print(rawCode);
         cmd.exec();
         this.onceEntryResultPrinted();
         return;
       }
     }
+
+    let code;
+
+    try {
+      code = this.compile(rawCode);
+    } catch(ex) {
+      this.dumpEntryResult('', ex.toString().slice(7), rawCode);
+      this.onceEntryResultPrinted();
+      return;
+    }
+
+    var output = this.languageName != 'js' && this.logCompiledCode ?
+      rawCode + '\n\n/*' + code + '*/' : rawCode;
+    this.print(output);
 
     let error, result;
     try {
@@ -274,7 +351,7 @@ let JSTermUI = {
       error = ex;
     }
 
-    this.dumpEntryResult(result, error, code);
+    this.dumpEntryResult(result, error, rawCode);
     this.onceEntryResultPrinted();
   },
 
@@ -301,21 +378,35 @@ let JSTermUI = {
       return;
     }
 
-    let isAnArray = Array.isArray(result);
-    let isAnObject = !isAnArray && ((typeof result) == "object");
-    let isAFunction = ((typeof result) == "function");
-    let isAString = (typeof result) == "string";
+    let maxLength = 80;
+    let type = ({}).toString.call(result).slice(8, -1);
+    let isAnObject = typeof result == "object";
+    let elementClass = /^HTML\w+Element$/;
 
     let resultStr;
-    if (result === undefined) {
-      resultStr = "undefined";
-    } else if(result === null) {
-      resultStr = "null";
+    if (result == null) {
+      resultStr = "" + result;
       isAnObject = false;
-    } else if (isAString) {
+    } else if (type == "String") {
       resultStr = "\"" + result + "\"";
-    } else if (isAnArray) {
-      resultStr = "[" + result.join(", ") + "]";
+    } else if (type == "NodeList") {
+      let isEmpty = result.length == 0;
+      let tagNames = [].slice.call(result).map(serializeNode);
+      resultStr = "[" + tagNames.join(", ") + "]";
+    } else if (elementClass.test(type)) {
+      resultStr = serializeNode(result);
+    } else if (isAnObject && 'length' in result) {
+      let serialized = [].slice.call(result)
+        .map(function(item) {
+          let cls = toString.call(item).slice(8, -1);
+          if (elementClass.test(cls)) {
+            return serializeNode(item);
+          } else {
+            return item;
+          }
+        })
+        .join(", ");
+      resultStr = "[" + serialized + "]";
     } else {
       resultStr = result.toString();
     }
@@ -324,15 +415,20 @@ let JSTermUI = {
       return;
     }
 
+    // TODO: Check for long output that looks shitty.
+    // if (resultStr.length > maxLength) {
+    //   resultStr = resultStr.slice(0, maxLength) + ' ...';
+    // }
+
     if (isAnObject) {
       resultStr += " [+]";
     }
 
     if (this.isMultiline(resultStr)) {
-      if (!isAFunction) {
-        resultStr = "\n/*\n" + resultStr + "\n*/";
-      } else {
+      if (type == "Function") {
         resultStr = "\n" + resultStr;
+      } else {
+        resultStr = "\n/*\n" + resultStr + "\n*/";
       }
     } else {
       if (this.isMultiline(code)) {
@@ -471,7 +567,7 @@ let JSTermUI = {
 
   destroy: function() {
     this.input.editorElement.removeEventListener("keydown", this.handleKeys, true);
-    this.completion.destroy();
+    if (this.completion) this.completion.destroy();
     this.completion = null;
     this.treeview = null;
     this.input = null;
@@ -479,6 +575,7 @@ let JSTermUI = {
     this.objects = null;
     this.printQueue = null;
     this.printTimeout = null;
+    this.compile = null;
   },
 
   inspect: function(obj) {
