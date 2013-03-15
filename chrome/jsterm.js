@@ -118,13 +118,13 @@ let JSTermUI = {
       initialText: defaultOutputText,
       mode: SourceEditor.MODES.JAVASCRIPT,
       readOnly: true,
-      theme: "chrome://jsterm/content/orion.css",
+      theme: "chrome://jsterm/skin/orion.css",
     }, this.initOutput.bind(this));
 
     this.input.init(this.inputContainer, {
       initialText: defaultInputText,
       mode: SourceEditor.MODES.JAVASCRIPT,
-      theme: "chrome://jsterm/content/orion.css",
+      theme: "chrome://jsterm/skin/orion.css",
     }, this.initInput.bind(this));
 
     this.variableView = new VariablesView(document.querySelector("#variables"));
