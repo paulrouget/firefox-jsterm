@@ -9,7 +9,7 @@ The language you choose will be saved for the next console session.
 
 Screenshot:
 
-![](http://f.cl.ly/items/151E3z1m150S3p2T1z3J/Screen%20Shot%202013-02-25%20at%204.52.26%20AM.png)
+![](http://i.imgur.com/qUby4pc.png)
 
 ## Installation
 
