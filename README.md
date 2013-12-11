@@ -1,5 +1,7 @@
 # Terminal for Firefox
 
+**Warning:** the addon is being integrated into Firefox natively. It is no longer supported.
+
 This Firefox addon contains full-featured console that supports
 JS, [CoffeeScript](http://coffeescript.org) and [LiveScript](http://livescript.net).
 
